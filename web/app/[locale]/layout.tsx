@@ -26,7 +26,9 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: '/images/favicon.png'
-  }
+  },
+  // TEMPORARY: keep the site out of search engines until launch. Remove this line to allow indexing.
+  robots: { index: false }
 };
 
 // Pages under here call the backend API at request time (live stock/price
