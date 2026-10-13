@@ -1,8 +1,8 @@
 {
   "folders": [
-    { "name": "api (Express + Postgres)", "path": "TrakwayAPI" },
-    { "name": "admin (Angular)", "path": "TrakwayAdmin" },
-    { "name": "web (Next.js)", "path": "trakway-web" },
+    { "name": "api (Express + Postgres)", "path": "api" },
+    { "name": "admin (Angular)", "path": "admin" },
+    { "name": "web (Next.js)", "path": "web" },
     { "name": "root", "path": "." }
   ],
   "settings": {
@@ -11,9 +11,9 @@
       "**/.angular": true,
       "**/.next": true,
       "**/dist": true,
-      "TrakwayAPI": true,
-      "TrakwayAdmin": true,
-      "trakway-web": true
+      "api": true,
+      "admin": true,
+      "web": true
     },
     "search.exclude": {
       "**/node_modules": true,

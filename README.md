@@ -2,9 +2,9 @@
 
 | Folder | App | Stack | Dev URL |
 | --- | --- | --- | --- |
-| `TrakwayAPI` | Backend API | Node + Express 5 + PostgreSQL | http://localhost:5000 |
-| `TrakwayAdmin` | Admin panel | Angular 21 | http://localhost:4200 |
-| `trakway-web` | Public website | Next.js 16 | http://localhost:3000 |
+| `api` | Backend API | Node + Express 5 + PostgreSQL | http://localhost:5000 |
+| `admin` | Admin panel | Angular 21 | http://localhost:4200 |
+| `web` | Public website | Next.js 16 | http://localhost:3000 |
 
 ## Prerequisites
 
@@ -19,8 +19,8 @@ npm install
 npm run install:all
 
 # 2. Environment files
-cp TrakwayAPI/.env.example TrakwayAPI/.env              # fill in DB_PASSWORD, JWT_SECRET
-cp trakway-web/.env.local.example trakway-web/.env.local
+cp api/.env.example api/.env              # fill in DB_PASSWORD, JWT_SECRET
+cp web/.env.local.example web/.env.local
 
 # 3. Database
 createdb trakway          # or create it in pgAdmin
