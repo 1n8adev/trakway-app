@@ -1,0 +1,270 @@
+<div>
+  <div class="mb-5">
+    <h3 class="text-[16px] font-semibold text-gray-800">Combinations</h3>
+    <p class="text-[14px] text-gray-500">Priced options customers choose from, e.g. Vodafone Sim + 1 Year Recharge = ₹4,000, with an optional offer (fixed offer price or % off).</p>
+  </div>
+
+  @if (attributesLoading()) {
+    <div class="space-y-3">
+      <div class="h-10 w-2/3 animate-pulse rounded bg-gray-100"></div>
+      <div class="h-32 animate-pulse rounded bg-gray-100"></div>
+    </div>
+  } @else if (attributesError()) {
+    <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ attributesError() }}</div>
+  } @else {
+    @if (error()) {
+      <div class="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+    }
+
+    <!-- Step 1: attributes -->
+    <div class="mb-6">
+      <p class="mb-2 text-[15px] text-gray-700">1. Attributes used by this product</p>
+      @if (attributes().length) {
+        <div class="flex flex-wrap gap-2">
+          @for (attr of attributes(); track attr.id) {
+            <button
+              type="button"
+              (click)="toggleAttribute(attr)"
+              class="flex items-center gap-2 rounded-md border px-3.5 py-2 text-[14px] font-medium transition"
+              [class]="isSelected(attr.id) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-300 text-gray-600 hover:border-gray-400'"
+              [attr.aria-pressed]="isSelected(attr.id)"
+            >
+              <span
+                class="flex h-4 w-4 items-center justify-center rounded border"
+                [class]="isSelected(attr.id) ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-400'"
+              >
+                @if (isSelected(attr.id)) {
+                  <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                }
+              </span>
+              {{ attr.name }}
+              <span class="text-[12px] font-normal text-gray-400">{{ attr.values.length }}</span>
+              @if (!attr.is_active) {
+                <span class="text-[12px] font-normal text-gray-400">(inactive)</span>
+              }
+            </button>
+          }
+        </div>
+        @if (errors()['attributes']; as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        }
+      } @else {
+        <p class="text-[14px] text-gray-500">
+          No attributes yet.
+          <a routerLink="/attributes" class="font-medium text-brand-500 hover:underline">Create attributes</a>
+          like SIM or Recharge Plan first.
+        </p>
+      }
+    </div>
+
+    <!-- Step 2: combinations -->
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <p class="text-[15px] text-gray-700">
+        2. Combinations <span class="text-[13px] text-gray-400">({{ rows().length }} / {{ limits.maxVariants }})</span>
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          (click)="generateAll()"
+          [disabled]="!selectedAttributes().length || !missingCount() || rows().length >= limits.maxVariants"
+          class="flex h-[38px] items-center gap-2 rounded-md bg-brand-100 px-4 text-[14px] font-medium text-brand-700 transition hover:bg-brand-200 disabled:opacity-50"
+          title="Add every combination of the selected attributes' active values"
+        >
+          Generate all
+          @if (selectedAttributes().length && missingCount()) {
+            <span class="rounded bg-white/70 px-1.5 text-[12px]">+{{ missingCount() }}</span>
+          }
+        </button>
+        <button
+          type="button"
+          (click)="addRow()"
+          [disabled]="!selectedAttributes().length || rows().length >= limits.maxVariants"
+          class="flex h-[38px] items-center gap-2 rounded-md border border-dashed border-brand-300 px-4 text-[14px] font-medium text-brand-500 transition hover:bg-brand-50 disabled:opacity-50"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Add combination
+        </button>
+      </div>
+    </div>
+
+    @if (rows().length) {
+      <div class="overflow-x-auto rounded-md border border-gray-200">
+        <table class="w-full text-left" [style.min-width.px]="700 + selectedAttributes().length * 180">
+          <thead class="bg-gray-50">
+            <tr class="text-[13px] font-medium tracking-wide text-gray-700 uppercase">
+              @for (attr of selectedAttributes(); track attr.id) {
+                <th class="px-3 py-3 font-medium">{{ attr.name }}</th>
+              }
+              <th class="w-36 px-3 py-3 font-medium">Price (₹)</th>
+              <th class="w-[264px] px-3 py-3 font-medium">Offer</th>
+              <th class="w-36 px-3 py-3 font-medium">Selling price</th>
+              <th class="w-44 px-3 py-3 font-medium">SKU</th>
+              <th class="w-24 px-3 py-3 font-medium">Active</th>
+              <th class="w-12 px-3 py-3"><span class="sr-only">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.key; let i = $index) {
+              <tr class="border-t border-gray-200 align-top">
+                @for (attr of selectedAttributes(); track attr.id; let first = $first) {
+                  <td class="px-3 py-2.5">
+                    <select
+                      [ngModel]="row.values[attr.id]"
+                      (ngModelChange)="setValue(i, attr.id, $event)"
+                      class="h-[40px] px-2.5"
+                      [class]="FIELD_BASE + ' ' + fieldState(!!rowError(i, 'values') && row.values[attr.id] == null) + (row.values[attr.id] == null ? ' text-gray-400' : '')"
+                      [attr.aria-label]="attr.name + ' for row ' + (i + 1)"
+                    >
+                      <option [ngValue]="null" disabled>Select {{ attr.name }}</option>
+                      @for (v of attr.values; track v.id) {
+                        <option [ngValue]="v.id" class="text-gray-800">{{ v.value }}{{ v.is_active ? '' : ' (inactive)' }}</option>
+                      }
+                    </select>
+                    @if (first && rowError(i, 'values'); as msg) {
+                      <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                    }
+                  </td>
+                }
+                <td class="px-3 py-2.5">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputmode="decimal"
+                    [(ngModel)]="row.price"
+                    (ngModelChange)="touch(); clearError('variants[' + i + '].price')"
+                    placeholder="0.00"
+                    class="h-[40px] px-3"
+                    [class]="FIELD_BASE + ' ' + fieldState(!!rowError(i, 'price'))"
+                    [attr.aria-label]="'Price for row ' + (i + 1)"
+                  />
+                  @if (rowError(i, 'price'); as msg) {
+                    <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                  }
+                </td>
+                <td class="px-3 py-2.5">
+                  <!-- Fixed grid: FIELD_BASE carries w-full, so a width on the select itself is overridden. -->
+                  <div class="grid grid-cols-[124px_minmax(0,1fr)] gap-2">
+                    <select
+                      [ngModel]="row.offer_type"
+                      (ngModelChange)="onOfferTypeChange(i, $event)"
+                      class="h-[40px] px-2"
+                      [class]="FIELD_BASE + ' ' + fieldState(!!rowError(i, 'offer_type'))"
+                      [attr.aria-label]="'Offer type for row ' + (i + 1)"
+                    >
+                      <option value="">No offer</option>
+                      <option value="price">Offer price</option>
+                      <option value="percentage">% off</option>
+                    </select>
+                    @if (row.offer_type) {
+                      <div class="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputmode="decimal"
+                          [(ngModel)]="row.offer_value"
+                          (ngModelChange)="touch(); clearError('variants[' + i + '].offer_value')"
+                          [placeholder]="row.offer_type === 'price' ? '0.00' : '10'"
+                          class="h-[40px] pr-7 pl-3"
+                          [class]="FIELD_BASE + ' ' + fieldState(!!rowError(i, 'offer_value'))"
+                          [attr.aria-label]="(row.offer_type === 'price' ? 'Offer price' : 'Percent off') + ' for row ' + (i + 1)"
+                        />
+                        <span class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[13px] text-gray-400">
+                          {{ row.offer_type === 'price' ? '₹' : '%' }}
+                        </span>
+                      </div>
+                    }
+                  </div>
+                  @if (rowError(i, 'offer_value') || rowError(i, 'offer_type'); as msg) {
+                    <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                  }
+                </td>
+                <td class="px-3 py-2.5">
+                  @if (pricing(row); as pr) {
+                    <div class="pt-2 leading-tight">
+                      <p class="text-[15px] font-semibold text-gray-800">{{ rupees(pr.final) }}</p>
+                      @if (pr.discountPercent > 0) {
+                        <p class="mt-0.5 text-[12px]">
+                          <span class="text-gray-400 line-through">{{ rupees(+row.price!) }}</span>
+                          <span class="ml-1 font-medium text-green-600">-{{ pr.discountPercent }}%</span>
+                        </p>
+                      }
+                    </div>
+                  } @else {
+                    <p class="pt-2 text-[14px] text-gray-400">—</p>
+                  }
+                </td>
+                <td class="px-3 py-2.5">
+                  <input
+                    [(ngModel)]="row.sku"
+                    (ngModelChange)="touch(); clearError('variants[' + i + '].sku')"
+                    maxlength="100"
+                    placeholder="Optional"
+                    class="h-[40px] px-3"
+                    [class]="FIELD_BASE + ' ' + fieldState(!!rowError(i, 'sku'))"
+                    [attr.aria-label]="'SKU for row ' + (i + 1)"
+                  />
+                  @if (rowError(i, 'sku'); as msg) {
+                    <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                  }
+                </td>
+                <td class="px-3 py-2.5">
+                  <label class="mt-2 inline-flex cursor-pointer items-center">
+                    <input type="checkbox" class="peer sr-only" [(ngModel)]="row.is_active" (ngModelChange)="touch()" [attr.aria-label]="'Active, row ' + (i + 1)" />
+                    <span
+                      class="relative h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-brand-500 peer-focus-visible:ring-4 peer-focus-visible:ring-brand-600/25 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
+                    ></span>
+                  </label>
+                </td>
+                <td class="px-3 py-2.5">
+                  <button
+                    type="button"
+                    (click)="removeRow(i)"
+                    class="mt-1 rounded-full p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
+                    [attr.aria-label]="'Remove row ' + (i + 1)"
+                  >
+                    <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="rounded-md border-2 border-dashed border-gray-200 px-6 py-10 text-center text-[15px] text-gray-500">
+        @if (selectedAttributes().length) {
+          No combinations yet. Use <span class="font-medium text-gray-700">Generate all</span> or
+          <span class="font-medium text-gray-700">Add combination</span>.
+        } @else {
+          Select the attributes above to start building combinations.
+        }
+      </div>
+    }
+
+    <div class="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-5">
+      <p class="mr-auto text-[13px] text-gray-500">Removing a saved row deletes that combination when you save.</p>
+      <button
+        type="button"
+        (click)="submit()"
+        [disabled]="saving()"
+        class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        @if (saving()) {
+          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.3" stroke-width="3" />
+            <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
+          Saving…
+        } @else {
+          Save Combinations
+        }
+      </button>
+    </div>
+  }
+</div>

@@ -1,0 +1,103 @@
+<div class="flex max-h-[90vh] flex-col font-sans">
+  <!-- Header -->
+  <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+    <h2 class="text-[18px] font-semibold text-gray-800">{{ isEdit ? 'Edit FAQ' : 'Add FAQ' }}</h2>
+    <button
+      type="button"
+      (click)="close()"
+      [disabled]="saving()"
+      class="rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
+      aria-label="Close"
+    >
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="flex min-h-0 flex-1 flex-col">
+    <div class="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+      @if (error()) {
+        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+      }
+
+      <!-- Question -->
+      <div>
+        <div class="mb-2 flex items-end justify-between">
+          <label for="faq-question" class="block text-[15px] text-gray-700">Question</label>
+          <span class="text-[12px] text-gray-400">{{ form.controls.question.value.length }} / {{ limits.maxQuestion }}</span>
+        </div>
+        <textarea
+          id="faq-question"
+          formControlName="question"
+          rows="2"
+          [maxlength]="limits.maxQuestion"
+          placeholder="e.g. What is a Fleet Management System (FMS) and how does it work?"
+          class="px-4 py-3"
+          [class]="FIELD_BASE + ' ' + fieldClass('question')"
+        ></textarea>
+        @if (fieldError('question'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        }
+      </div>
+
+      <!-- Answer -->
+      <div>
+        <span class="mb-2 block text-[15px] text-gray-700">Answer</span>
+        <app-rich-editor
+          formControlName="answer"
+          label="Answer"
+          placeholder="Write a clear answer. You can use lists, bold text and links."
+          minHeight="200px"
+          [invalid]="!!fieldError('answer')"
+        />
+        @if (fieldError('answer'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        }
+      </div>
+
+      <!-- Status -->
+      <div>
+        <label for="faq-status" class="mb-2 block text-[15px] text-gray-700">Status</label>
+        <div class="relative">
+          <select
+            id="faq-status"
+            [value]="form.controls.is_active.value ? 'active' : 'inactive'"
+            (change)="onStatusChange($any($event.target).value)"
+            class="h-[46px] appearance-none border-gray-300 pr-11 pl-4 focus:border-brand-600 focus:ring-brand-600/15"
+            [class]="FIELD_BASE"
+          >
+            <option value="active">Active · shown on the website</option>
+            <option value="inactive">Inactive · hidden</option>
+          </select>
+          <svg class="pointer-events-none absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
+      <button
+        type="submit"
+        [disabled]="saving()"
+        class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        @if (saving()) {
+          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.3" stroke-width="3" />
+            <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
+          Saving…
+        } @else {
+          {{ isEdit ? 'Save Changes' : 'Add' }}
+        }
+      </button>
+      <button
+        type="button"
+        (click)="close()"
+        [disabled]="saving()"
+        class="h-[42px] rounded-md bg-red-50 px-6 text-[15px] font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+      >
+        Discard
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,324 @@
+<!-- Header -->
+<div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+  <div class="min-w-0">
+    <button type="button" (click)="back()" class="mb-1 inline-flex items-center gap-1 text-[14px] text-gray-500 hover:text-brand-500">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      Website Users
+    </button>
+    @if (user(); as u) {
+      <div class="flex items-center gap-3">
+        <span
+          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[16px] font-semibold"
+          [class]="u.is_active ? 'bg-brand-100 text-brand-500' : 'bg-gray-100 text-gray-400'"
+        >{{ initials() || '?' }}</span>
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 class="truncate text-[22px] font-semibold text-gray-800">{{ u.name }}</h1>
+            @if (u.is_active) {
+              <span class="rounded bg-green-50 px-2.5 py-1 text-[13px] font-medium text-green-700">Active</span>
+            } @else {
+              <span class="rounded bg-red-50 px-2.5 py-1 text-[13px] font-medium text-red-600">Blocked</span>
+            }
+          </div>
+          <p class="text-[14px] text-gray-500">Customer #{{ u.id }} · joined {{ u.created_at | date: 'd MMM y' }}</p>
+        </div>
+      </div>
+    } @else {
+      <h1 class="text-[22px] font-semibold text-gray-800">Customer</h1>
+    }
+  </div>
+
+  @if (user(); as u) {
+    <button
+      type="button"
+      (click)="toggleStatus()"
+      [disabled]="saving()"
+      class="h-[42px] rounded-md px-5 text-[15px] font-medium transition disabled:opacity-60"
+      [class]="
+        u.is_active
+          ? 'bg-red-50 text-red-500 hover:bg-red-100'
+          : 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] hover:brightness-105'
+      "
+    >
+      {{ saving() ? 'Saving…' : u.is_active ? 'Block Customer' : 'Unblock Customer' }}
+    </button>
+  }
+</div>
+
+@if (loading() && !user()) {
+  <div class="mb-5 grid grid-cols-2 gap-5 lg:grid-cols-4">
+    @for (_ of [1, 2, 3, 4]; track $index) {
+      <div class="h-[92px] animate-pulse rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]"></div>
+    }
+  </div>
+  <div class="h-72 animate-pulse rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]"></div>
+} @else if (error() && !user()) {
+  <div class="rounded-md bg-white px-6 py-14 text-center shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    <p class="text-red-600">{{ error() }}</p>
+    <button type="button" class="mt-2 font-medium text-brand-500 hover:underline" (click)="fetch()">Try again</button>
+  </div>
+} @else if (user(); as u) {
+  @let s = u.order_stats;
+
+  <!-- Stats -->
+  <div class="mb-5 grid grid-cols-2 gap-5 lg:grid-cols-4">
+    <div class="rounded-md bg-white px-5 py-4 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+      <p class="text-[13px] text-gray-500">Orders</p>
+      <p class="mt-1 text-[24px] font-semibold text-gray-800">{{ s.orders_count }}</p>
+      <p class="text-[13px] text-gray-500">
+        @if (s.last_order_at) {
+          Last {{ s.last_order_at | date: 'd MMM y' }}
+        } @else {
+          No orders yet
+        }
+      </p>
+    </div>
+    <div class="rounded-md bg-white px-5 py-4 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+      <p class="text-[13px] text-gray-500">Total spent</p>
+      <p class="mt-1 text-[24px] font-semibold text-gray-800">{{ rupees(s.total_spent) }}</p>
+      <p class="text-[13px] text-gray-500">{{ s.delivered }} delivered</p>
+    </div>
+    <div class="rounded-md bg-white px-5 py-4 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+      <p class="text-[13px] text-gray-500">In progress</p>
+      <p class="mt-1 text-[24px] font-semibold" [class]="s.active_orders ? 'text-brand-500' : 'text-gray-800'">{{ rupees(s.pending_amount) }}</p>
+      <p class="text-[13px] text-gray-500">{{ s.active_orders }} {{ s.active_orders === 1 ? 'order' : 'orders' }} to deliver</p>
+    </div>
+    <div class="rounded-md bg-white px-5 py-4 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+      <p class="text-[13px] text-gray-500">Saved</p>
+      <p class="mt-1 text-[24px] font-semibold text-green-700">{{ rupees(s.coupon_savings + s.offer_savings) }}</p>
+      <p class="text-[13px] text-gray-500">{{ rupees(s.offer_savings) }} offers · {{ rupees(s.coupon_savings) }} coupons</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
+    <!-- Orders -->
+    <section class="overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:col-span-2">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 pt-4 lg:px-6">
+        <h2 class="pb-3 text-[16px] font-semibold text-gray-800">Orders</h2>
+        <div class="flex gap-1 overflow-x-auto" role="tablist" aria-label="Filter orders">
+          @for (tab of orderTabs(); track tab.value) {
+            <button
+              type="button"
+              role="tab"
+              [attr.aria-selected]="orderTab() === tab.value"
+              (click)="orderTab.set(tab.value)"
+              class="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 pb-3 text-[14px] font-medium transition"
+              [class]="orderTab() === tab.value ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-600 hover:text-gray-800'"
+            >
+              {{ tab.label }}
+              <span
+                class="min-w-5 rounded-full px-1.5 text-center text-[12px] font-semibold"
+                [class]="orderTab() === tab.value ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600'"
+              >{{ tab.count }}</span>
+            </button>
+          }
+        </div>
+      </div>
+
+      @for (o of orders(); track o.id) {
+        @let open = expanded().has(o.id);
+        <article class="border-b border-gray-200 last:border-0">
+          <!-- Order header (click to expand) -->
+          <button
+            type="button"
+            (click)="toggleOrder(o.id)"
+            [attr.aria-expanded]="open"
+            class="flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 text-left transition hover:bg-gray-50 lg:px-6"
+          >
+            <svg
+              class="h-4 w-4 shrink-0 text-gray-400 transition"
+              [class.rotate-90]="open"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            ><path d="m9 18 6-6-6-6" /></svg>
+            <div class="min-w-[130px]">
+              <p class="font-medium text-gray-800">{{ o.order_no }}</p>
+              <p class="text-[13px] text-gray-500">{{ o.created_at | date: 'd MMM y, h:mm a' }}</p>
+            </div>
+            @if (!open) {
+              <div class="flex -space-x-2">
+                @for (item of thumbs(o); track item.id) {
+                  <span class="h-9 w-9 overflow-hidden rounded-md border-2 border-white bg-gray-50">
+                    <img [src]="assetUrl(item.image) ?? 'no-image.png'" [alt]="item.product_name" class="h-full w-full object-cover" />
+                  </span>
+                }
+                @if (o.items.length > 4) {
+                  <span class="flex h-9 w-9 items-center justify-center rounded-md border-2 border-white bg-gray-100 text-[12px] font-medium text-gray-600">+{{ o.items.length - 4 }}</span>
+                }
+              </div>
+            }
+            <div class="ml-auto flex items-center gap-3">
+              <span class="rounded px-2.5 py-1 text-[13px] font-medium whitespace-nowrap" [class]="STATUS_BADGE[o.status]">{{ STATUS_LABEL[o.status] }}</span>
+              <span class="min-w-[84px] text-right font-semibold whitespace-nowrap text-gray-800">{{ rupees(o.total) }}</span>
+            </div>
+          </button>
+
+          @if (open) {
+            <div class="space-y-4 bg-gray-50/60 px-5 pb-5 lg:px-6 lg:pl-14">
+              <!-- Items -->
+              <ul class="divide-y divide-gray-100 rounded-md border border-gray-200 bg-white">
+                @for (item of o.items; track item.id) {
+                  <li class="flex items-center gap-3 px-4 py-3">
+                    <span class="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-gray-100 bg-gray-50">
+                      <img [src]="assetUrl(item.image) ?? 'no-image.png'" [alt]="item.product_name" class="h-full w-full object-cover" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      @if (item.product_id) {
+                        <a [routerLink]="['/products', item.product_id, 'edit']" class="block truncate text-[15px] font-medium text-gray-800 hover:text-brand-500">{{ item.product_name }}</a>
+                      } @else {
+                        <span class="block truncate text-[15px] font-medium text-gray-800">{{ item.product_name }}</span>
+                      }
+                      <p class="truncate text-[13px] text-gray-500">
+                        {{ item.variant_label || 'Standard' }} · {{ rupees(item.final_price) }} × {{ item.quantity }}
+                      </p>
+                    </div>
+                    <span class="text-[15px] font-medium whitespace-nowrap text-gray-800">{{ rupees(item.line_total) }}</span>
+                  </li>
+                }
+              </ul>
+
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <h3 class="mb-1 text-[12px] font-medium tracking-wider text-gray-400 uppercase">Delivery</h3>
+                  <p class="text-[14px] font-medium text-gray-800">{{ o.ship_name }}</p>
+                  <p class="text-[13px] leading-relaxed whitespace-pre-line text-gray-600">{{ shipAddress(o) }}</p>
+                  <p class="text-[13px] text-gray-600">+91 {{ o.ship_phone }}</p>
+                </div>
+                <div>
+                  <h3 class="mb-1 text-[12px] font-medium tracking-wider text-gray-400 uppercase">Billing</h3>
+                  @if (o.bill_company_name) {
+                    <p class="text-[14px] font-medium text-gray-800">{{ o.bill_company_name }}</p>
+                  }
+                  @if (o.bill_gstin) {
+                    <p class="text-[13px] text-gray-500">GSTIN <span class="font-mono text-gray-700">{{ o.bill_gstin }}</span></p>
+                  }
+                  <p class="text-[14px] font-medium text-gray-800">{{ o.bill_name }}</p>
+                  <p class="text-[13px] leading-relaxed whitespace-pre-line text-gray-600">{{ billAddress(o) }}</p>
+                  <p class="text-[13px] text-gray-600">+91 {{ o.bill_phone }}</p>
+                </div>
+                <div>
+                  <h3 class="mb-1 text-[12px] font-medium tracking-wider text-gray-400 uppercase">Payment</h3>
+                  <dl class="space-y-1 text-[13px]">
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500">Subtotal</dt><dd class="text-gray-800">{{ rupees(o.subtotal) }}</dd></div>
+                  @if (o.coupon_discount > 0) {
+                    <div class="flex justify-between gap-3">
+                      <dt class="text-gray-500">Coupon {{ o.coupon_code }}</dt>
+                      <dd class="text-green-700">−{{ rupees(o.coupon_discount) }}</dd>
+                    </div>
+                  }
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500">Shipping</dt><dd class="text-gray-800">{{ o.shipping_fee > 0 ? rupees(o.shipping_fee) : 'Free' }}</dd></div>
+                  <div class="flex justify-between gap-3 font-semibold"><dt class="text-gray-800">Total</dt><dd class="text-gray-800">{{ rupees(o.total) }}</dd></div>
+                  <div class="pt-1">
+                    <span class="rounded px-2 py-0.5 text-[12px] font-medium" [class]="PAYMENT_BADGE[o.payment_status]">COD · {{ PAYMENT_LABEL[o.payment_status] }}</span>
+                  </div>
+                  </dl>
+                </div>
+              </div>
+
+              @if (o.status === 'cancelled' && o.cancel_reason) {
+                <p class="rounded-md bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700">Cancelled: {{ o.cancel_reason }}</p>
+              }
+              @if (o.customer_note) {
+                <p class="rounded-md bg-brand-50 px-3.5 py-2.5 text-[13px] text-gray-700"><span class="font-medium">Customer note:</span> {{ o.customer_note }}</p>
+              }
+              @if (o.admin_notes) {
+                <p class="rounded-md bg-gray-100 px-3.5 py-2.5 text-[13px] whitespace-pre-line text-gray-700"><span class="font-medium">Admin notes:</span> {{ o.admin_notes }}</p>
+              }
+
+              <a [routerLink]="['/orders', o.id]" class="inline-flex items-center gap-1 text-[14px] font-medium text-brand-500 hover:underline">
+                Open order to update status
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+              </a>
+            </div>
+          }
+        </article>
+      } @empty {
+        <p class="px-6 py-12 text-center text-gray-500">
+          @if (orderTab() === 'all') {
+            {{ u.name }} hasn't placed any orders yet.
+          } @else {
+            No orders here.
+          }
+        </p>
+      }
+    </section>
+
+    <!-- Right column -->
+    <div class="space-y-5">
+      <section class="rounded-md bg-white px-6 py-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+        <h2 class="mb-3 text-[16px] font-semibold text-gray-800">Profile</h2>
+        <dl class="space-y-3 text-[14px]">
+          <div>
+            <dt class="text-[13px] text-gray-500">Email</dt>
+            <dd class="flex flex-wrap items-center gap-2">
+              <a [href]="'mailto:' + u.email" class="break-all text-gray-800 hover:text-brand-500">{{ u.email }}</a>
+              @if (u.email_verified) {
+                <span class="rounded bg-green-50 px-2 py-0.5 text-[12px] font-medium text-green-700">Verified</span>
+              } @else {
+                <span class="rounded bg-amber-50 px-2 py-0.5 text-[12px] font-medium text-amber-700">Not verified</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[13px] text-gray-500">Phone</dt>
+            <dd>
+              @if (u.phone) {
+                <a [href]="'tel:' + u.phone" class="text-gray-800 hover:text-brand-500">{{ u.phone }}</a>
+              } @else {
+                <span class="text-gray-400">Not given</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[13px] text-gray-500">Last login</dt>
+            <dd class="text-gray-800">{{ u.last_login_at ? (u.last_login_at | date: 'd MMM y, h:mm a') : 'Never' }}</dd>
+          </div>
+          <div class="flex gap-6">
+            <div>
+              <dt class="text-[13px] text-gray-500">Logged-in devices</dt>
+              <dd class="text-gray-800">{{ u.active_sessions }}</dd>
+            </div>
+            <div>
+              <dt class="text-[13px] text-gray-500">In cart</dt>
+              <dd class="text-gray-800">
+                @if (u.cart.quantity) {
+                  {{ u.cart.quantity }} {{ u.cart.quantity === 1 ? 'item' : 'items' }}
+                } @else {
+                  <span class="text-gray-400">Empty</span>
+                }
+              </dd>
+            </div>
+          </div>
+        </dl>
+        @if (!u.is_active) {
+          <p class="mt-4 rounded-md bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700">Blocked: this customer can't sign in or order.</p>
+        }
+      </section>
+
+      <section class="rounded-md bg-white px-6 py-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+        <h2 class="mb-3 text-[16px] font-semibold text-gray-800">
+          Saved addresses <span class="text-[14px] font-normal text-gray-400">({{ u.addresses.length }})</span>
+        </h2>
+        @for (a of u.addresses; track a.id) {
+          <div class="border-t border-gray-100 py-3 first:border-0 first:pt-0 last:pb-0">
+            <p class="flex items-center gap-2 text-[14px] font-medium text-gray-800">
+              {{ a.name }}
+              @if (a.is_default) {
+                <span class="rounded bg-brand-100 px-1.5 py-0.5 text-[11px] font-semibold text-brand-600 uppercase">Default</span>
+              }
+            </p>
+            <p class="text-[13px] leading-relaxed whitespace-pre-line text-gray-600">{{ savedAddress(a) }}</p>
+            <p class="text-[13px] text-gray-600">+91 {{ a.phone }}</p>
+          </div>
+        } @empty {
+          <p class="text-[14px] text-gray-400">No saved addresses.</p>
+        }
+      </section>
+    </div>
+  </div>
+}

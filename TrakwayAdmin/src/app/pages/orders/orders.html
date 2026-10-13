@@ -1,0 +1,253 @@
+<div class="overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+  <!-- Status tabs -->
+  <div class="flex gap-1 overflow-x-auto border-b border-gray-200 px-3 lg:px-4" role="tablist" aria-label="Order status">
+    @for (tab of tabs; track tab.value) {
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="status === tab.value"
+        (click)="selectTab(tab.value)"
+        class="-mb-px flex shrink-0 items-center gap-2 border-b-2 px-4 py-4 text-[15px] font-medium transition"
+        [class]="status === tab.value ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-600 hover:text-gray-800'"
+      >
+        {{ tab.label }}
+        @if (summary(); as s) {
+          <span
+            class="min-w-6 rounded-full px-2 py-0.5 text-center text-[12px] font-semibold"
+            [class]="status === tab.value ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600'"
+          >{{ s[tab.value] }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  <!-- Filters -->
+  <div class="flex flex-wrap items-center gap-3 px-5 py-5 lg:px-6">
+    <div class="relative w-full sm:w-72">
+      <svg class="pointer-events-none absolute top-1/2 left-3.5 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <input
+        type="search"
+        placeholder="ORD-…, name, phone, pincode, GSTIN"
+        [(ngModel)]="search"
+        (ngModelChange)="onSearch($event)"
+        aria-label="Search orders"
+        class="h-[42px] w-full rounded-md border border-gray-300 bg-white pr-3 pl-10 text-[15px] text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      />
+    </div>
+
+    <select
+      [(ngModel)]="paymentStatus"
+      (ngModelChange)="onFilterChange()"
+      aria-label="Filter by payment status"
+      class="h-[42px] rounded-md border border-gray-300 bg-white px-3 pr-8 text-[15px] text-gray-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+    >
+      <option value="">Any payment</option>
+      @for (p of paymentStatuses; track p) {
+        <option [value]="p">Payment {{ PAYMENT_LABEL[p].toLowerCase() }}</option>
+      }
+    </select>
+
+    <div class="flex items-center gap-2">
+      <label class="text-[13px] text-gray-500" for="order-from">Ordered</label>
+      <input
+        id="order-from"
+        type="date"
+        [(ngModel)]="from"
+        (ngModelChange)="onFilterChange()"
+        [max]="to || today"
+        aria-label="Ordered from"
+        class="h-[42px] rounded-md border border-gray-300 bg-white px-3 text-[15px] text-gray-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      />
+      <span class="text-gray-400">–</span>
+      <input
+        type="date"
+        [(ngModel)]="to"
+        (ngModelChange)="onFilterChange()"
+        [min]="from || null"
+        [max]="today"
+        aria-label="Ordered to"
+        class="h-[42px] rounded-md border border-gray-300 bg-white px-3 text-[15px] text-gray-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      />
+    </div>
+
+    @if (userId) {
+      <span class="flex h-[34px] items-center gap-1.5 rounded-full bg-brand-50 pr-1.5 pl-3.5 text-[14px] text-brand-600">
+        Customer: <span class="font-medium">{{ customerName() ?? '#' + userId }}</span>
+        <button type="button" (click)="clearCustomer()" class="rounded-full p-1 hover:bg-brand-100" aria-label="Show all customers">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
+      </span>
+    }
+
+    @if (hasFilters) {
+      <button type="button" (click)="clearFilters()" class="h-[42px] px-2 text-[14px] font-medium text-brand-500 hover:underline">Clear filters</button>
+    }
+  </div>
+
+  <!-- Table -->
+  <div class="relative overflow-x-auto border-t border-gray-200">
+    @if (loading() && orders().length) {
+      <div class="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-brand-100">
+        <div class="h-full w-1/3 animate-pulse bg-brand-600"></div>
+      </div>
+    }
+
+    <table class="w-full min-w-[960px] text-left">
+      <thead>
+        <tr class="border-b border-gray-200 text-[13px] font-medium tracking-wide text-gray-800 uppercase">
+          <th class="py-4 pr-4 pl-5 font-medium lg:pl-6">Order</th>
+          <th class="px-4 py-4 font-medium">Customer</th>
+          <th class="px-4 py-4 font-medium">Deliver to</th>
+          <th class="px-4 py-4 text-right font-medium">Total</th>
+          <th class="px-4 py-4 font-medium">Payment</th>
+          <th class="px-4 py-4 font-medium">Status</th>
+          <th class="py-4 pr-5 pl-4 text-right font-medium lg:pr-6">Actions</th>
+        </tr>
+      </thead>
+
+      <tbody class="text-[15px]">
+        @if (loading() && !orders().length) {
+          @for (_ of [1, 2, 3, 4, 5]; track $index) {
+            <tr class="border-b border-gray-200">
+              <td class="py-4 pr-4 pl-5 lg:pl-6">
+                <div class="animate-pulse space-y-2">
+                  <div class="h-3.5 w-24 rounded bg-gray-100"></div>
+                  <div class="h-3 w-32 rounded bg-gray-100"></div>
+                </div>
+              </td>
+              <td colspan="6" class="px-4 py-4"><div class="h-3.5 w-full animate-pulse rounded bg-gray-100"></div></td>
+            </tr>
+          }
+        } @else if (error()) {
+          <tr>
+            <td colspan="7" class="px-6 py-14 text-center">
+              <p class="text-red-600">{{ error() }}</p>
+              <button type="button" class="mt-2 font-medium text-brand-500 hover:underline" (click)="load()">Try again</button>
+            </td>
+          </tr>
+        } @else {
+          @for (o of orders(); track o.id) {
+            <tr class="border-b border-gray-200 align-top transition hover:bg-gray-50" [class.opacity-60]="busyId() === o.id">
+              <td class="py-3.5 pr-4 pl-5 lg:pl-6">
+                <a [routerLink]="['/orders', o.id]" [state]="{ fromList: true }" class="font-medium text-gray-800 hover:text-brand-500">{{ o.order_no }}</a>
+                <p class="text-[13px] whitespace-nowrap text-gray-500">{{ o.created_at | date: 'd MMM y, h:mm a' }}</p>
+                <p class="text-[13px] text-gray-500">{{ o.items_count }} {{ o.items_count === 1 ? 'item' : 'items' }}</p>
+              </td>
+              <td class="px-4 py-3.5">
+                <p class="text-gray-800">{{ o.customer.name }}</p>
+                <p class="max-w-[220px] truncate text-[14px] text-gray-500">{{ o.customer.email }}</p>
+                @if (o.bill_company_name) {
+                  <p class="max-w-[220px] truncate text-[13px] text-gray-500" [title]="o.bill_gstin ? 'GSTIN ' + o.bill_gstin : ''">
+                    {{ o.bill_company_name }}{{ o.bill_gstin ? ' · GST' : '' }}
+                  </p>
+                }
+              </td>
+              <td class="px-4 py-3.5">
+                <p class="text-gray-800">{{ o.ship_name }}</p>
+                <p class="text-[14px] whitespace-nowrap text-gray-500">{{ o.ship_city }}, {{ o.ship_pincode }}</p>
+              </td>
+              <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                <p class="font-medium text-gray-800">{{ rupees(o.total) }}</p>
+                @if (o.coupon_code) {
+                  <p class="text-[13px] text-gray-500" [title]="'Coupon ' + o.coupon_code">−{{ rupees(o.coupon_discount) }} · {{ o.coupon_code }}</p>
+                }
+              </td>
+              <td class="px-4 py-3.5">
+                <span class="rounded px-2.5 py-1 text-[13px] font-medium whitespace-nowrap" [class]="PAYMENT_BADGE[o.payment_status]">{{ PAYMENT_LABEL[o.payment_status] }}</span>
+                <p class="mt-1.5 text-[13px] text-gray-500">Cash on Delivery</p>
+              </td>
+              <td class="px-4 py-3.5">
+                <span class="rounded px-2.5 py-1 text-[13px] font-medium whitespace-nowrap" [class]="STATUS_BADGE[o.status]">{{ STATUS_LABEL[o.status] }}</span>
+              </td>
+              <td class="py-3 pr-5 pl-4 lg:pr-6">
+                <div class="flex items-center justify-end gap-1">
+                  <a
+                    [routerLink]="['/orders', o.id]" [state]="{ fromList: true }"
+                    class="rounded-full p-2 text-gray-600 transition hover:bg-gray-100 hover:text-brand-500"
+                    [attr.aria-label]="'View ' + o.order_no"
+                  >
+                    <svg class="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </a>
+                  @if (o.next_statuses.length) {
+                    <button
+                      type="button"
+                      [matMenuTriggerFor]="rowMenu"
+                      [disabled]="busyId() === o.id"
+                      class="rounded-full p-2 text-gray-600 transition hover:bg-gray-100 disabled:opacity-50"
+                      [attr.aria-label]="'Change status of ' + o.order_no"
+                    >
+                      <svg class="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <circle cx="12" cy="5" r="1.75" />
+                        <circle cx="12" cy="12" r="1.75" />
+                        <circle cx="12" cy="19" r="1.75" />
+                      </svg>
+                    </button>
+                    <mat-menu #rowMenu="matMenu" xPosition="before">
+                      @for (next of o.next_statuses; track next) {
+                        <button mat-menu-item type="button" (click)="changeStatus(o, next)">
+                          <span [class.text-red-600]="next === 'cancelled'">{{ ACTION_LABEL[next] }}</span>
+                        </button>
+                      }
+                    </mat-menu>
+                  } @else {
+                    <span class="w-[38px]"></span>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7" class="px-6 py-14 text-center text-gray-500">
+                @if (hasFilters) {
+                  No orders match your filters.
+                } @else if (status === 'placed') {
+                  No new orders waiting. You're all caught up.
+                } @else if (status === 'all') {
+                  No orders yet.
+                } @else {
+                  No {{ STATUS_LABEL[status].toLowerCase() }} orders.
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  @if (pagination(); as p) {
+    @if (p.total) {
+      <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-[14px] text-gray-500 lg:px-6">
+        <span>{{ p.total }} {{ p.total === 1 ? 'order' : 'orders' }}</span>
+        @if (p.totalPages > 1) {
+          <nav class="flex items-center gap-1.5" aria-label="Pagination">
+            <button
+              type="button"
+              (click)="goTo(page - 1)"
+              [disabled]="page <= 1 || loading()"
+              class="h-9 rounded-md bg-gray-100 px-3 text-gray-600 transition hover:bg-brand-100 hover:text-brand-500 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span class="px-2">Page {{ p.page }} of {{ p.totalPages }}</span>
+            <button
+              type="button"
+              (click)="goTo(page + 1)"
+              [disabled]="page >= p.totalPages || loading()"
+              class="h-9 rounded-md bg-gray-100 px-3 text-gray-600 transition hover:bg-brand-100 hover:text-brand-500 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  }
+</div>

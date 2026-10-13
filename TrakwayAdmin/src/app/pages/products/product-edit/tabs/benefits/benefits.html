@@ -1,0 +1,126 @@
+<div>
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h3 class="text-[16px] font-semibold text-gray-800">Benefits</h3>
+      <p class="text-[14px] text-gray-500">Key benefits shown with an icon or image, e.g. "Live tracking" or "Long battery life".</p>
+    </div>
+    <span class="text-[13px] text-gray-500">{{ rows().length }} / {{ limits.maxBenefits }}</span>
+  </div>
+
+  @if (error()) {
+    <div class="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+  }
+
+  <div class="space-y-4">
+    @for (row of rows(); track row.key; let i = $index, first = $first, last = $last) {
+      <div class="rounded-md border border-gray-200 p-4 sm:p-5">
+        <div class="mb-4 flex items-center justify-between">
+          <span class="text-[14px] font-medium text-gray-500">Benefit {{ i + 1 }}</span>
+          <div class="flex items-center gap-1">
+            <button type="button" (click)="move(i, -1)" [disabled]="first" class="rounded p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30" aria-label="Move up">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6" /></svg>
+            </button>
+            <button type="button" (click)="move(i, 1)" [disabled]="last" class="rounded p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30" aria-label="Move down">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+            <button type="button" (click)="remove(i)" class="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600" [attr.aria-label]="'Remove benefit ' + (i + 1)">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-[112px_1fr]">
+          <!-- Image -->
+          <div>
+            <div class="relative h-28 w-28 overflow-hidden rounded-md border border-gray-200 bg-gray-50">
+              <img [src]="imageSrc(row) ?? 'no-image.png'" alt="Benefit image" class="h-full w-full object-cover" />
+            </div>
+            <div class="mt-2 flex flex-col items-start gap-0.5">
+              <button type="button" class="text-[13px] font-medium text-brand-500 hover:underline" (click)="file.click()">
+                {{ imageSrc(row) ? 'Change image' : 'Upload image' }}
+              </button>
+              @if (imageSrc(row)) {
+                <button type="button" class="text-[13px] font-medium text-red-600 hover:underline" (click)="removeImage(i)">Remove</button>
+              }
+            </div>
+            <input #file type="file" class="hidden" accept="image/jpeg,image/png,image/webp,image/gif" (change)="onImageSelected(i, $event)" />
+          </div>
+
+          <!-- Text -->
+          <div class="space-y-4">
+            <div>
+              <label [for]="'b-title-' + row.key" class="mb-2 block text-[15px] text-gray-700">Title <span class="text-red-500">*</span></label>
+              <input
+                [id]="'b-title-' + row.key"
+                [(ngModel)]="row.title"
+                (ngModelChange)="touch(); clearError('benefits[' + i + '].title')"
+                maxlength="200"
+                placeholder="e.g. Real-time live tracking"
+                class="h-[46px] px-4"
+                [class]="FIELD_BASE + ' ' + fieldState(!!errors()['benefits[' + i + '].title'])"
+              />
+              @if (errors()['benefits[' + i + '].title']; as msg) {
+                <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+              }
+            </div>
+            <div>
+              <label [for]="'b-desc-' + row.key" class="mb-2 block text-[15px] text-gray-700">Description</label>
+              <textarea
+                [id]="'b-desc-' + row.key"
+                [(ngModel)]="row.description"
+                (ngModelChange)="touch()"
+                rows="2"
+                placeholder="Short explanation of the benefit"
+                class="px-4 py-3"
+                [class]="FIELD_BASE + ' ' + fieldState(!!errors()['benefits[' + i + '].description'])"
+              ></textarea>
+              @if (errors()['benefits[' + i + '].description']; as msg) {
+                <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+              }
+            </div>
+            @if (errors()['benefits[' + i + '].image']; as msg) {
+              <p class="text-[13px] text-red-600">{{ msg }}</p>
+            }
+          </div>
+        </div>
+      </div>
+    } @empty {
+      <div class="rounded-md border-2 border-dashed border-gray-200 px-6 py-10 text-center text-[15px] text-gray-500">
+        No benefits yet.
+      </div>
+    }
+  </div>
+
+  <button
+    type="button"
+    (click)="add()"
+    [disabled]="rows().length >= limits.maxBenefits"
+    class="mt-4 flex h-[42px] items-center gap-2 rounded-md border border-dashed border-brand-300 px-5 text-[15px] font-medium text-brand-500 transition hover:bg-brand-50 disabled:opacity-50"
+  >
+    <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+    Add benefit
+  </button>
+
+  <div class="mt-6 flex justify-end border-t border-gray-200 pt-5">
+    <button
+      type="button"
+      (click)="submit()"
+      [disabled]="saving()"
+      class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      @if (saving()) {
+        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.3" stroke-width="3" />
+          <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+        </svg>
+        Saving…
+      } @else {
+        Save Benefits
+      }
+    </button>
+  </div>
+</div>

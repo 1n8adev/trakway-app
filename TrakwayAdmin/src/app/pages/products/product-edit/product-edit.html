@@ -1,0 +1,122 @@
+<!-- Header -->
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <div class="min-w-0">
+    <a routerLink="/products" class="mb-1 inline-flex items-center gap-1 text-[14px] text-gray-500 hover:text-brand-500">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      Products
+    </a>
+    <h1 class="truncate text-[22px] font-semibold text-gray-800">
+      {{ product()?.name ?? (id() ? 'Edit Product' : 'Add a new Product') }}
+    </h1>
+    @if (product(); as p) {
+      <p class="text-[14px] text-gray-500">{{ p.category_name }} · /{{ p.slug }}</p>
+    } @else if (!id()) {
+      <p class="text-[14px] text-gray-500">Start with the basic information. The other tabs unlock after the product is created.</p>
+    }
+  </div>
+
+  @if (product(); as p) {
+    <div class="flex items-center gap-3">
+      @if (p.is_active) {
+        <span class="rounded bg-green-50 px-2.5 py-1 text-[13px] font-medium text-green-700">Active</span>
+      } @else {
+        <span class="rounded bg-gray-100 px-2.5 py-1 text-[13px] font-medium text-gray-500">Inactive</span>
+      }
+      <button
+        type="button"
+        (click)="toggleStatus()"
+        [disabled]="statusBusy()"
+        class="h-[40px] rounded-md bg-gray-100 px-4 text-[14px] font-medium text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
+      >
+        {{ p.is_active ? 'Deactivate' : 'Activate' }}
+      </button>
+    </div>
+  }
+</div>
+
+@if (loading()) {
+  <div class="rounded-md bg-white p-6 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    <div class="mb-6 flex gap-3">
+      @for (_ of [1, 2, 3, 4]; track $index) {
+        <div class="h-9 w-32 animate-pulse rounded-md bg-gray-100"></div>
+      }
+    </div>
+    <div class="space-y-4">
+      <div class="h-11 animate-pulse rounded bg-gray-100"></div>
+      <div class="h-11 w-2/3 animate-pulse rounded bg-gray-100"></div>
+      <div class="h-28 animate-pulse rounded bg-gray-100"></div>
+    </div>
+  </div>
+} @else if (loadError()) {
+  <div class="rounded-md bg-white px-6 py-14 text-center shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    <p class="text-red-600">{{ loadError() }}</p>
+    <a routerLink="/products" class="mt-2 inline-block font-medium text-brand-500 hover:underline">Back to products</a>
+  </div>
+} @else {
+  <!-- Tabs -->
+  <nav class="mb-5 flex gap-2 overflow-x-auto pb-1" aria-label="Product sections" role="tablist">
+    @for (tab of tabs; track tab.key; let i = $index) {
+      <button
+        type="button"
+        role="tab"
+        (click)="selectTab(tab)"
+        [disabled]="isLocked(tab)"
+        [attr.aria-selected]="activeTab() === tab.key"
+        [title]="isLocked(tab) ? 'Create the product (Basic Information) first' : tab.label"
+        class="flex shrink-0 items-center gap-2 rounded-md px-4 py-2.5 text-[15px] font-medium whitespace-nowrap transition"
+        [class]="
+          activeTab() === tab.key
+            ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)]'
+            : isLocked(tab)
+              ? 'cursor-not-allowed bg-white text-gray-400 shadow-[0_1px_4px_rgba(47,43,61,0.08)]'
+              : 'bg-white text-gray-700 shadow-[0_1px_4px_rgba(47,43,61,0.08)] hover:text-brand-500'
+        "
+      >
+        <span
+          class="flex h-5 w-5 items-center justify-center rounded-full text-[12px]"
+          [class]="activeTab() === tab.key ? 'bg-white/25' : isLocked(tab) ? 'bg-gray-100' : 'bg-brand-100 text-brand-500'"
+        >
+          @if (isLocked(tab)) {
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          } @else {
+            {{ i + 1 }}
+          }
+        </span>
+        {{ tab.label }}
+        @if (product() && tab.badge) {
+          <span
+            class="rounded px-1.5 text-[12px]"
+            [class]="activeTab() === tab.key ? 'bg-white/25' : 'bg-gray-100 text-gray-500'"
+          >{{ tab.badge(product()!) }}</span>
+        }
+      </button>
+    }
+  </nav>
+
+  <!-- Active tab -->
+  <div class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:p-6">
+    @switch (activeTab()) {
+      @case ('basic') {
+        <app-product-basic-info [product]="product()" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
+      }
+      @case ('benefits') {
+        <app-product-benefits [product]="product()!" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
+      }
+      @case ('specifications') {
+        <app-product-specifications [product]="product()!" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
+      }
+      @case ('package') {
+        <app-product-html-content field="package_details" [product]="product()!" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
+      }
+      @case ('box') {
+        <app-product-html-content field="box_contents" [product]="product()!" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
+      }
+      @case ('combinations') {
+        <app-product-combinations [product]="product()!" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
+      }
+    }
+  </div>
+}

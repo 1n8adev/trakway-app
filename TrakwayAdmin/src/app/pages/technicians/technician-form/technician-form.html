@@ -1,0 +1,220 @@
+<div class="flex max-h-[90vh] flex-col font-sans">
+  <!-- Header -->
+  <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+    <h2 class="text-[18px] font-semibold text-gray-800">{{ isEdit ? 'Edit Technician' : 'Onboard Technician' }}</h2>
+    <button
+      type="button"
+      (click)="close()"
+      [disabled]="saving()"
+      class="rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
+      aria-label="Close"
+    >
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="flex min-h-0 flex-1 flex-col">
+    <div class="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+      @if (error()) {
+        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+      }
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <!-- Name -->
+        <div>
+          <label for="tech-name" class="mb-2 block text-[15px] text-gray-700">Name <span class="text-red-500">*</span></label>
+          <input
+            id="tech-name"
+            type="text"
+            formControlName="name"
+            [maxlength]="limits.maxName"
+            placeholder="e.g. Suresh Kumar"
+            class="h-[46px] px-4"
+            [class]="FIELD_BASE + ' ' + fieldClass('name')"
+          />
+          @if (fieldError('name'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          }
+        </div>
+
+        <!-- Mobile -->
+        <div>
+          <label for="tech-mobile" class="mb-2 block text-[15px] text-gray-700">Mobile <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <span class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[15px] text-gray-500">+91</span>
+            <input
+              id="tech-mobile"
+              type="tel"
+              inputmode="tel"
+              formControlName="mobile"
+              maxlength="16"
+              placeholder="98400 12345"
+              class="h-[46px] pr-4 pl-12"
+              [class]="FIELD_BASE + ' ' + fieldClass('mobile')"
+            />
+          </div>
+          @if (fieldError('mobile'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          }
+        </div>
+
+        <!-- Email -->
+        <div class="sm:col-span-2">
+          <label for="tech-email" class="mb-2 block text-[15px] text-gray-700">Email <span class="text-[13px] text-gray-400">(optional)</span></label>
+          <input
+            id="tech-email"
+            type="email"
+            formControlName="email"
+            [maxlength]="limits.maxEmail"
+            placeholder="suresh@example.com"
+            class="h-[46px] px-4"
+            [class]="FIELD_BASE + ' ' + fieldClass('email')"
+          />
+          @if (fieldError('email'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          }
+        </div>
+
+        <!-- Address -->
+        <div class="sm:col-span-2">
+          <div class="mb-2 flex items-end justify-between">
+            <label for="tech-address" class="block text-[15px] text-gray-700">Shop / home address <span class="text-red-500">*</span></label>
+            <span class="text-[12px] text-gray-400">{{ form.controls.address.value.length }} / {{ limits.maxAddress }}</span>
+          </div>
+          <textarea
+            id="tech-address"
+            formControlName="address"
+            rows="2"
+            [maxlength]="limits.maxAddress"
+            placeholder="Door no, street, area, city"
+            class="px-4 py-3"
+            [class]="FIELD_BASE + ' ' + fieldClass('address')"
+          ></textarea>
+          @if (fieldError('address'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          }
+        </div>
+
+        <!-- State -->
+        <div>
+          <label for="tech-state" class="mb-2 block text-[15px] text-gray-700">State <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <select
+              id="tech-state"
+              formControlName="state"
+              class="h-[46px] appearance-none pr-11 pl-4"
+              [class]="FIELD_BASE + ' ' + fieldClass('state')"
+            >
+              <option value="" disabled>Select state</option>
+              @for (s of states(); track s) {
+                <option [value]="s">{{ s }}</option>
+              }
+            </select>
+            <svg class="pointer-events-none absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
+          @if (fieldError('state'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          }
+        </div>
+
+        <!-- Pincode -->
+        <div>
+          <label for="tech-pincode" class="mb-2 block text-[15px] text-gray-700">Pincode <span class="text-red-500">*</span></label>
+          <input
+            id="tech-pincode"
+            type="text"
+            inputmode="numeric"
+            formControlName="pincode"
+            maxlength="6"
+            placeholder="600045"
+            class="h-[46px] px-4"
+            [class]="FIELD_BASE + ' ' + fieldClass('pincode')"
+          />
+          @if (fieldError('pincode'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          }
+        </div>
+      </div>
+
+      <!-- Photos -->
+      <div>
+        <p class="mb-3 text-[13px] text-gray-500">
+          One image each, JPG/PNG/WEBP/GIF, max {{ limits.maxPhotoMb }} MB.
+          @if (isEdit) {
+            Upload a new photo only to replace the current one.
+          }
+        </p>
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <app-photo-picker
+            inputId="tech-photo"
+            label="Technician photo"
+            [preview]="photos().technician_photo.preview"
+            [error]="photos().technician_photo.error"
+            (picked)="onPhoto('technician_photo', $event)"
+          />
+          <app-photo-picker
+            inputId="tech-shop-photo"
+            label="Shop photo"
+            [preview]="photos().shop_photo.preview"
+            [error]="photos().shop_photo.error"
+            (picked)="onPhoto('shop_photo', $event)"
+          />
+          <app-photo-picker
+            inputId="tech-id-proof"
+            label="ID proof"
+            hint="Aadhaar, PAN or licence · kept private"
+            [preview]="photos().id_proof_photo.preview"
+            [error]="photos().id_proof_photo.error"
+            [loading]="idProofLoading()"
+            (picked)="onPhoto('id_proof_photo', $event)"
+          />
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="sm:w-1/2">
+        <label for="tech-status" class="mb-2 block text-[15px] text-gray-700">Status</label>
+        <div class="relative">
+          <select
+            id="tech-status"
+            [value]="form.controls.is_active.value ? 'active' : 'inactive'"
+            (change)="form.controls.is_active.setValue($any($event.target).value === 'active')"
+            class="h-[46px] appearance-none border-gray-300 pr-11 pl-4 focus:border-brand-600 focus:ring-brand-600/15"
+            [class]="FIELD_BASE"
+          >
+            <option value="active">Active · can be assigned bookings</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <svg class="pointer-events-none absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
+      <button
+        type="submit"
+        [disabled]="saving()"
+        class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        @if (saving()) {
+          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.3" stroke-width="3" />
+            <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
+          {{ isEdit ? 'Saving…' : 'Uploading…' }}
+        } @else {
+          {{ isEdit ? 'Save Changes' : 'Onboard' }}
+        }
+      </button>
+      <button
+        type="button"
+        (click)="close()"
+        [disabled]="saving()"
+        class="h-[42px] rounded-md bg-red-50 px-6 text-[15px] font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+      >
+        Discard
+      </button>
+    </div>
+  </form>
+</div>

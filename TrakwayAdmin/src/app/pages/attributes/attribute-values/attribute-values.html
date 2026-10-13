@@ -1,0 +1,169 @@
+<div class="flex max-h-[90vh] flex-col font-sans">
+  <!-- Header -->
+  <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+    <div class="min-w-0">
+      <h2 class="truncate text-[18px] font-semibold text-gray-800">{{ attribute().name }} · Values</h2>
+      <p class="text-[13px] text-gray-500">
+        {{ attribute().values.length }} {{ attribute().values.length === 1 ? 'value' : 'values' }}, {{ activeCount() }} active. Changes save immediately.
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="close()"
+      class="rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+      aria-label="Close"
+    >
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    </button>
+  </div>
+
+  <!-- Add value -->
+  <form class="border-b border-gray-200 px-6 py-5" (submit)="$event.preventDefault(); add()" novalidate>
+    <label for="new-value" class="mb-2 block text-[15px] text-gray-700">Add value</label>
+    <div class="flex flex-wrap gap-3">
+      <input
+        id="new-value"
+        [value]="newValue()"
+        (input)="newValue.set($any($event.target).value); error.set(null)"
+        maxlength="100"
+        placeholder="Enter value, e.g. 5 Year Recharge"
+        class="h-[46px] min-w-0 flex-1 basis-56 rounded-md border border-gray-300 bg-white px-4 text-[16px] text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      />
+      <input
+        type="number"
+        step="1"
+        [value]="newSort()"
+        (input)="newSort.set(toNumber($any($event.target).value))"
+        aria-label="Sort order"
+        title="Sort order"
+        class="h-[46px] w-24 rounded-md border border-gray-300 bg-white px-3 text-[16px] text-gray-800 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      />
+      <button
+        type="submit"
+        [disabled]="adding()"
+        class="flex h-[46px] items-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-5 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:opacity-70"
+      >
+        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        {{ adding() ? 'Adding…' : 'Add' }}
+      </button>
+    </div>
+    @if (error(); as msg) {
+      <p class="mt-2 text-[13px] text-red-600" role="alert">{{ msg }}</p>
+    }
+  </form>
+
+  <!-- Values list -->
+  <div class="min-h-0 flex-1 overflow-y-auto">
+    @if (!attribute().values.length) {
+      <p class="px-6 py-12 text-center text-[15px] text-gray-500">No values yet. Add the first one above.</p>
+    } @else {
+      <table class="w-full text-left">
+        <thead>
+          <tr class="border-b border-gray-200 text-[13px] font-medium tracking-wide text-gray-800 uppercase">
+            <th class="px-6 py-3 font-medium">Value</th>
+            <th class="w-24 px-3 py-3 text-right font-medium">Sort</th>
+            <th class="w-28 px-3 py-3 font-medium">Status</th>
+            <th class="w-28 py-3 pr-6 pl-3 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="text-[15px]">
+          @for (v of attribute().values; track v.id) {
+            <tr class="border-b border-gray-100 last:border-0" [class.opacity-60]="busyId() === v.id">
+              @if (editingId() === v.id) {
+                <td class="px-6 py-2">
+                  <input
+                    [value]="editValue()"
+                    (input)="editValue.set($any($event.target).value); error.set(null)"
+                    (keydown.enter)="saveEdit(v)"
+                    (keydown.escape)="$event.stopPropagation(); cancelEdit()"
+                    maxlength="100"
+                    aria-label="Value"
+                    class="h-[38px] w-full rounded-md border border-gray-300 px-3 text-[15px] text-gray-800 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+                  />
+                </td>
+                <td class="px-3 py-2">
+                  <input
+                    type="number"
+                    step="1"
+                    [value]="editSort()"
+                    (input)="editSort.set(toNumber($any($event.target).value))"
+                    (keydown.enter)="saveEdit(v)"
+                    aria-label="Sort order"
+                    class="h-[38px] w-full rounded-md border border-gray-300 px-2 text-right text-[15px] text-gray-800 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+                  />
+                </td>
+                <td class="px-3 py-2"></td>
+                <td class="py-2 pr-6 pl-3">
+                  <div class="flex justify-end gap-1">
+                    <button type="button" (click)="saveEdit(v)" [disabled]="busyId() === v.id" class="rounded-full p-2 text-green-600 hover:bg-green-50" aria-label="Save">
+                      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                    </button>
+                    <button type="button" (click)="cancelEdit()" class="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Cancel edit">
+                      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                </td>
+              } @else {
+                <td class="px-6 py-3 font-medium text-gray-800">{{ v.value }}</td>
+                <td class="px-3 py-3 text-right text-gray-600">{{ v.sort_order }}</td>
+                <td class="px-3 py-3">
+                  <button
+                    type="button"
+                    (click)="toggle(v)"
+                    [disabled]="busyId() === v.id"
+                    [title]="v.is_active ? 'Click to deactivate' : 'Click to activate'"
+                    class="rounded px-2.5 py-1 text-[13px] font-medium transition"
+                    [class]="v.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+                  >
+                    {{ v.is_active ? 'Active' : 'Inactive' }}
+                  </button>
+                </td>
+                <td class="py-3 pr-6 pl-3">
+                  <div class="flex justify-end gap-1">
+                    <button
+                      type="button"
+                      (click)="startEdit(v)"
+                      [disabled]="busyId() === v.id"
+                      class="rounded-full p-2 text-gray-600 transition hover:bg-gray-100 hover:text-brand-500"
+                      [attr.aria-label]="'Edit ' + v.value"
+                    >
+                      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M7 7H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1" />
+                        <path d="M20.385 6.585a2.1 2.1 0 0 0-2.97-2.97L9 12v3h3l8.385-8.415Z" />
+                        <path d="m16 5 3 3" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="remove(v)"
+                      [disabled]="busyId() === v.id"
+                      class="rounded-full p-2 text-gray-600 transition hover:bg-red-50 hover:text-red-600"
+                      [attr.aria-label]="'Delete ' + v.value"
+                    >
+                      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <!-- Footer -->
+  <div class="flex justify-end border-t border-gray-200 px-6 py-4">
+    <button
+      type="button"
+      (click)="close()"
+      class="h-[42px] rounded-md bg-gray-100 px-6 text-[15px] font-medium text-gray-600 transition hover:bg-gray-200"
+    >
+      Done
+    </button>
+  </div>
+</div>

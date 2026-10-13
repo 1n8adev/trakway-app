@@ -1,0 +1,31 @@
+{
+  "name": "trakway-api",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "db:check": "node src/database/checkDb.js",
+    "migrate": "node src/database/migrate.js",
+    "seed:admin": "node src/database/seeds/createAdmin.js",
+    "mail:check": "node src/database/checkMail.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Trakway ecommerce API",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.1",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.16",
+    "pg": "^8.23.1",
+    "sanitize-html": "^2.18.0"
+  }
+}

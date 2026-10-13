@@ -1,0 +1,232 @@
+<div class="overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+  <!-- Toolbar -->
+  <div class="flex flex-wrap items-center gap-3 px-5 py-5 lg:px-6">
+    <div class="relative w-full sm:w-72">
+      <svg class="pointer-events-none absolute top-1/2 left-3.5 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <input
+        type="search"
+        placeholder="Search FAQ"
+        [(ngModel)]="search"
+        (ngModelChange)="onSearch($event)"
+        aria-label="Search FAQs"
+        class="h-[42px] w-full rounded-md border border-gray-300 bg-white pr-3 pl-10 text-[15px] text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      />
+    </div>
+
+    <div class="ml-auto flex flex-wrap items-center gap-3">
+      <select
+        [(ngModel)]="status"
+        (ngModelChange)="onFilterChange()"
+        aria-label="Filter by status"
+        class="h-[42px] rounded-md border border-gray-300 bg-white px-3 pr-8 text-[15px] text-gray-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      >
+        <option value="">All status</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+      <button
+        type="button"
+        (click)="openForm()"
+        class="flex h-[42px] items-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-5 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none"
+      >
+        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        Add FAQ
+      </button>
+    </div>
+  </div>
+
+  <!-- Info bar -->
+  @if (faqs().length) {
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-200 bg-gray-50 px-5 py-2.5 text-[13px] text-gray-500 lg:px-6">
+      @if (canReorder()) {
+        <span class="flex items-center gap-1.5">
+          <svg class="h-4 w-4 text-brand-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+          </svg>
+          Drag the handle to change the order shown on the website.
+        </span>
+      } @else if (reorderHint(); as hint) {
+        <span>
+          {{ hint }}
+          @if (search || status) {
+            <button type="button" class="ml-1 font-medium text-brand-500 hover:underline" (click)="clearFilters()">Clear filters</button>
+          }
+        </span>
+      }
+      @if (saveOrderBusy()) {
+        <span class="text-brand-600">Saving order…</span>
+      }
+      <span class="ml-auto flex items-center gap-3">
+        <button type="button" class="font-medium text-gray-600 hover:text-brand-500" (click)="expandAll(true)">Expand all</button>
+        <button type="button" class="font-medium text-gray-600 hover:text-brand-500" (click)="expandAll(false)">Collapse all</button>
+      </span>
+    </div>
+  }
+
+  <!-- List -->
+  <div class="relative border-t border-gray-200">
+    @if (loading() && faqs().length) {
+      <div class="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-brand-100">
+        <div class="h-full w-1/3 animate-pulse bg-brand-600"></div>
+      </div>
+    }
+
+    @if (loading() && !faqs().length) {
+      @for (_ of [1, 2, 3, 4]; track $index) {
+        <div class="flex animate-pulse items-center gap-4 border-b border-gray-200 px-5 py-5 lg:px-6">
+          <div class="h-5 w-5 rounded bg-gray-100"></div>
+          <div class="h-4 flex-1 rounded bg-gray-100"></div>
+          <div class="h-6 w-16 rounded bg-gray-100"></div>
+        </div>
+      }
+    } @else if (error()) {
+      <div class="px-6 py-14 text-center">
+        <p class="text-red-600">{{ error() }}</p>
+        <button type="button" class="mt-2 font-medium text-brand-500 hover:underline" (click)="load()">Try again</button>
+      </div>
+    } @else if (!faqs().length) {
+      <div class="px-6 py-14 text-center text-gray-500">
+        @if (search || status) {
+          No FAQs match your filters.
+        } @else {
+          No FAQs yet. Add common questions about GPS trackers, installation, recharge plans and fleet management.
+        }
+      </div>
+    } @else {
+      <div cdkDropList [cdkDropListData]="faqs()" [cdkDropListDisabled]="!canReorder() || saveOrderBusy()" (cdkDropListDropped)="onDrop($event)">
+        @for (faq of faqs(); track faq.id; let i = $index) {
+          <div
+            cdkDrag
+            [cdkDragData]="faq"
+            class="border-b border-gray-200 bg-white"
+            [class.opacity-60]="busyId() === faq.id"
+          >
+            <!-- Drop placeholder -->
+            <div *cdkDragPlaceholder class="h-[64px] border-y-2 border-dashed border-brand-300 bg-brand-50"></div>
+
+            <div class="flex items-start gap-3 px-5 py-4 lg:px-6">
+              <button
+                type="button"
+                cdkDragHandle
+                [disabled]="!canReorder()"
+                class="mt-0.5 rounded p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+                [class.cursor-grab]="canReorder()"
+                [attr.aria-label]="'Drag to reorder: ' + faq.question"
+              >
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+                </svg>
+              </button>
+
+              <span class="mt-0.5 flex h-6 min-w-6 items-center justify-center rounded bg-brand-100 px-1 text-[12px] font-semibold text-brand-600">{{ i + 1 }}</span>
+
+              <button
+                type="button"
+                (click)="toggleExpanded(faq.id)"
+                class="min-w-0 flex-1 text-left"
+                [attr.aria-expanded]="isExpanded(faq.id)"
+              >
+                <span class="flex items-start gap-2">
+                  <span class="flex-1 text-[15px] font-medium text-gray-800">{{ faq.question }}</span>
+                  <svg
+                    class="mt-0.5 h-5 w-5 shrink-0 text-gray-400 transition-transform"
+                    [class.rotate-180]="isExpanded(faq.id)"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </span>
+              </button>
+
+              <div class="flex shrink-0 items-center gap-1">
+                @if (faq.is_active) {
+                  <span class="mr-1 hidden rounded bg-green-50 px-2.5 py-1 text-[13px] font-medium text-green-700 sm:inline">Active</span>
+                } @else {
+                  <span class="mr-1 hidden rounded bg-gray-100 px-2.5 py-1 text-[13px] font-medium text-gray-500 sm:inline">Inactive</span>
+                }
+                <button
+                  type="button"
+                  (click)="openForm(faq)"
+                  [disabled]="busyId() === faq.id"
+                  class="rounded-full p-2 text-gray-600 transition hover:bg-gray-100 hover:text-brand-500 disabled:opacity-50"
+                  [attr.aria-label]="'Edit FAQ ' + (i + 1)"
+                >
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M7 7H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1" />
+                    <path d="M20.385 6.585a2.1 2.1 0 0 0-2.97-2.97L9 12v3h3l8.385-8.415Z" />
+                    <path d="m16 5 3 3" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  [matMenuTriggerFor]="rowMenu"
+                  [disabled]="busyId() === faq.id"
+                  class="rounded-full p-2 text-gray-600 transition hover:bg-gray-100 disabled:opacity-50"
+                  [attr.aria-label]="'More actions for FAQ ' + (i + 1)"
+                >
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="1.75" />
+                    <circle cx="12" cy="12" r="1.75" />
+                    <circle cx="12" cy="19" r="1.75" />
+                  </svg>
+                </button>
+                <mat-menu #rowMenu="matMenu" xPosition="before">
+                  <button mat-menu-item type="button" (click)="toggleStatus(faq)">
+                    {{ faq.is_active ? 'Deactivate' : 'Activate' }}
+                  </button>
+                  <button mat-menu-item type="button" (click)="confirmDelete(faq)">
+                    <span class="text-red-600">Delete</span>
+                  </button>
+                </mat-menu>
+              </div>
+            </div>
+
+            @if (isExpanded(faq.id)) {
+              <!-- Answer HTML is cleaned by the API and sanitised again by Angular's [innerHTML]. -->
+              <div class="rich-content pr-6 pb-5 pl-[88px] text-[15px] text-gray-600 lg:pl-[96px]" [innerHTML]="faq.answer"></div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Footer -->
+  @if (pagination(); as p) {
+    @if (p.total) {
+      <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-[14px] text-gray-500 lg:px-6">
+        <span>{{ p.total }} {{ p.total === 1 ? 'FAQ' : 'FAQs' }} · {{ activeCount() }} active on this page</span>
+        @if (p.totalPages > 1) {
+          <nav class="flex items-center gap-1.5" aria-label="Pagination">
+            <button
+              type="button"
+              (click)="goTo(page - 1)"
+              [disabled]="page <= 1 || loading()"
+              class="h-9 rounded-md bg-gray-100 px-3 text-gray-600 transition hover:bg-brand-100 hover:text-brand-500 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span class="px-2">Page {{ p.page }} of {{ p.totalPages }}</span>
+            <button
+              type="button"
+              (click)="goTo(page + 1)"
+              [disabled]="page >= p.totalPages || loading()"
+              class="h-9 rounded-md bg-gray-100 px-3 text-gray-600 transition hover:bg-brand-100 hover:text-brand-500 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  }
+</div>
