@@ -53,6 +53,6 @@ __screenshots__/
 /*/.next/
 /*/out/
 /*/build
-.vercel
+.vercel/
 *.tsbuildinfo
 next-env.d.ts
