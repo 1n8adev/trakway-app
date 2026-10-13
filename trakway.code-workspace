@@ -1,0 +1,128 @@
+{
+  "folders": [
+    { "name": "api (Express + Postgres)", "path": "TrakwayAPI" },
+    { "name": "admin (Angular)", "path": "TrakwayAdmin" },
+    { "name": "web (Next.js)", "path": "trakway-web" },
+    { "name": "root", "path": "." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.angular": true,
+      "**/.next": true,
+      "**/dist": true,
+      "TrakwayAPI": true,
+      "TrakwayAdmin": true,
+      "trakway-web": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.angular": true,
+      "**/.next": true,
+      "**/dist": true,
+      "**/package-lock.json": true
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "postman.settings.dotenv-detection-notification-visibility": false
+  },
+  "extensions": {
+    "recommendations": [
+      "angular.ng-template",
+      "bradlc.vscode-tailwindcss",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "editorconfig.editorconfig",
+      "mikestead.dotenv"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "install: all",
+        "type": "shell",
+        "command": "npm install && npm run install:all",
+        "options": { "cwd": "${workspaceFolder:root}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "dev: api",
+        "type": "shell",
+        "command": "npm run dev",
+        "options": { "cwd": "${workspaceFolder:api (Express + Postgres)}" },
+        "isBackground": true,
+        "presentation": { "group": "dev", "panel": "dedicated" },
+        "problemMatcher": []
+      },
+      {
+        "label": "dev: admin",
+        "type": "shell",
+        "command": "npm start",
+        "options": { "cwd": "${workspaceFolder:admin (Angular)}" },
+        "isBackground": true,
+        "presentation": { "group": "dev", "panel": "dedicated" },
+        "problemMatcher": []
+      },
+      {
+        "label": "dev: web",
+        "type": "shell",
+        "command": "npm run dev",
+        "options": { "cwd": "${workspaceFolder:web (Next.js)}" },
+        "isBackground": true,
+        "presentation": { "group": "dev", "panel": "dedicated" },
+        "problemMatcher": []
+      },
+      {
+        "label": "dev: all",
+        "dependsOn": ["dev: api", "dev: admin", "dev: web"],
+        "dependsOrder": "parallel",
+        "group": { "kind": "build", "isDefault": true },
+        "problemMatcher": []
+      },
+      {
+        "label": "db: migrate",
+        "type": "shell",
+        "command": "npm run migrate",
+        "options": { "cwd": "${workspaceFolder:api (Express + Postgres)}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "db: seed admin",
+        "type": "shell",
+        "command": "npm run seed:admin",
+        "options": { "cwd": "${workspaceFolder:api (Express + Postgres)}" },
+        "problemMatcher": []
+      }
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "api: debug",
+        "type": "node",
+        "request": "launch",
+        "cwd": "${workspaceFolder:api (Express + Postgres)}",
+        "program": "${workspaceFolder:api (Express + Postgres)}/src/server.js",
+        "envFile": "${workspaceFolder:api (Express + Postgres)}/.env",
+        "skipFiles": ["<node_internals>/**"]
+      },
+      {
+        "name": "web: debug server",
+        "type": "node-terminal",
+        "request": "launch",
+        "cwd": "${workspaceFolder:web (Next.js)}",
+        "command": "npm run dev"
+      },
+      {
+        "name": "admin: open in Chrome",
+        "type": "chrome",
+        "request": "launch",
+        "url": "http://localhost:4200/",
+        "webRoot": "${workspaceFolder:admin (Angular)}"
+      }
+    ]
+  }
+}
