@@ -27,5 +27,8 @@
     "nodemailer": "^10.0.16",
     "pg": "^8.23.1",
     "sanitize-html": "^2.18.0"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
