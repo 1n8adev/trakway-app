@@ -19,8 +19,23 @@
     }
   </div>
 
-  @if (actions().length) {
+  @if (actions().length || canInvoice()) {
     <div class="flex flex-wrap items-center gap-3">
+      @if (canInvoice()) {
+        <button
+          type="button"
+          (click)="downloadInvoice()"
+          [disabled]="invoiceBusy()"
+          class="flex h-[42px] items-center gap-2 rounded-md border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 transition hover:border-brand-600 hover:text-brand-600 disabled:opacity-60"
+        >
+          <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M5 21h14" />
+          </svg>
+          {{ invoiceBusy() ? 'Preparing…' : 'Download Invoice' }}
+        </button>
+      }
       @for (s of actions(); track s) {
         @if (s === 'cancelled') {
           <button

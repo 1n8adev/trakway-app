@@ -10,6 +10,7 @@ const technicianRoutes = require('./technician/technician.routes');
 const userRoutes = require('./user/user.routes');
 const couponRoutes = require('./coupon/coupon.routes');
 const orderRoutes = require('./order/order.routes');
+const clientLogoRoutes = require('./client-logo/client-logo.routes');
 
 const router = express.Router();
 
@@ -27,5 +28,6 @@ router.use('/technicians', technicianRoutes);
 router.use('/users', userRoutes);
 router.use('/coupons', couponRoutes);
 router.use('/orders', orderRoutes);
+router.use('/client-logos', clientLogoRoutes);
 
 module.exports = router;

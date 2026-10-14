@@ -3,7 +3,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../core/services/auth.service';
 
-type NavIcon = 'products' | 'categories' | 'attributes' | 'faqs' | 'bookings' | 'technicians' | 'users' | 'coupons' | 'orders';
+type NavIcon = 'products' | 'categories' | 'attributes' | 'faqs' | 'clients' | 'bookings' | 'technicians' | 'users' | 'coupons' | 'orders';
 
 interface NavSection {
   heading: string;
@@ -51,7 +51,10 @@ export class AdminLayout implements OnInit {
     },
     {
       heading: 'Content',
-      items: [{ label: 'FAQs', path: '/faqs', icon: 'faqs' }],
+      items: [
+        { label: 'FAQs', path: '/faqs', icon: 'faqs' },
+        { label: 'Client Logos', path: '/client-logos', icon: 'clients' },
+      ],
     },
   ];
 

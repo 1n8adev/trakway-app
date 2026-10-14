@@ -4,7 +4,15 @@ import { useEffect, useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { AuthApiError } from '@/lib/auth';
-import { cancelOrder, canCancelOrder, fetchOrder, type Order, type OrderStatus } from '@/lib/checkout';
+import {
+  cancelOrder,
+  canCancelOrder,
+  canDownloadInvoice,
+  downloadInvoice,
+  fetchOrder,
+  type Order,
+  type OrderStatus
+} from '@/lib/checkout';
 import { formatPrice } from '@/lib/format';
 import { FormAlert } from '@/components/auth/fields';
 import { BillingAddress, GstDetails } from '@/components/checkout/OrderBilling';
@@ -133,6 +141,21 @@ export default function OrderDetails({ orderNo }: { orderNo: string }) {
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [invoicePending, setInvoicePending] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+
+  const onDownloadInvoice = async () => {
+    if (!order) return;
+    setInvoiceError(null);
+    setInvoicePending(true);
+    try {
+      await downloadInvoice(order.order_no);
+    } catch (err) {
+      setInvoiceError(errorMessage(err));
+    } finally {
+      setInvoicePending(false);
+    }
+  };
 
   useEffect(() => {
     fetchOrder(orderNo)
@@ -182,19 +205,42 @@ export default function OrderDetails({ orderNo }: { orderNo: string }) {
             </div>
             <p className="mt-1 text-sm text-gray-500">Placed on {formatOrderDateTime(order.created_at)}</p>
           </div>
-          {canCancelOrder(order) && !cancelling && (
-            <button
-              type="button"
-              onClick={() => {
-                setNotice(null);
-                setCancelling(true);
-              }}
-              className="rounded-full border-2 border-red-200 px-5 py-2 text-sm font-semibold text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white"
-            >
-              Cancel order
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {canDownloadInvoice(order) && (
+              <button
+                type="button"
+                onClick={onDownloadInvoice}
+                disabled={invoicePending}
+                className="inline-flex items-center gap-2 rounded-full border-2 border-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:border-brand-600 hover:text-brand-600 disabled:opacity-60"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3v12" />
+                  <path d="m7 10 5 5 5-5" />
+                  <path d="M5 21h14" />
+                </svg>
+                {invoicePending ? 'Preparing…' : 'Download invoice'}
+              </button>
+            )}
+            {canCancelOrder(order) && !cancelling && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNotice(null);
+                  setCancelling(true);
+                }}
+                className="rounded-full border-2 border-red-200 px-5 py-2 text-sm font-semibold text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white"
+              >
+                Cancel order
+              </button>
+            )}
+          </div>
         </div>
+
+        {invoiceError && (
+          <div className="mt-4">
+            <FormAlert>{invoiceError}</FormAlert>
+          </div>
+        )}
 
         <div className="mt-6">
           <Timeline order={order} />

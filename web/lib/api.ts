@@ -1,5 +1,6 @@
 import { htmlToParagraphs } from './html';
 import {
+  toAssetUrl,
   toCategory,
   toProductDetails,
   toProductSummary,
@@ -120,6 +121,22 @@ export type Faq = {
 export async function fetchFaqs(): Promise<Faq[]> {
   const { data } = await apiGet<{ id: number; question: string; answer: string | null }[]>('/api/faqs');
   return data.map((faq) => ({ id: faq.id, question: faq.question, answer: htmlToParagraphs(faq.answer) }));
+}
+
+export type ClientLogo = {
+  id: number;
+  name: string;
+  // Absolute URL of the logo on the backend.
+  image: string;
+};
+
+// GET /api/client-logos — active logos for the home page strip, in display order.
+export async function fetchClientLogos(): Promise<ClientLogo[]> {
+  const { data } = await apiGet<{ id: number; name: string; image: string }[]>('/api/client-logos');
+  return data.flatMap((logo) => {
+    const image = toAssetUrl(logo.image, API_URL);
+    return image ? [{ id: logo.id, name: logo.name, image }] : [];
+  });
 }
 
 export type BookingOption = { value: string; label: string };

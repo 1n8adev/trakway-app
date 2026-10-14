@@ -38,6 +38,22 @@ module.exports = {
   adminOrderEmails: (process.env.ADMIN_ORDER_EMAIL || '').split(',').map((e) => e.trim()).filter(Boolean),
   // Comma-separated origins allowed to call the API from a browser,
   // e.g. "https://trakway.in,https://admin.trakway.in". Empty = allow all (development).
+  // Seller details printed on tax invoices. The defaults are PLACEHOLDERS — set the real values in .env.
+  // INVOICE_SELLER_ADDRESS uses "|" between lines. Prices are treated as GST-inclusive at INVOICE_GST_RATE %.
+  invoice: {
+    sellerName: process.env.INVOICE_SELLER_NAME || 'Trakway Technologies Pvt. Ltd. (SAMPLE)',
+    sellerAddress: (process.env.INVOICE_SELLER_ADDRESS || 'No. 12, Sample Street|Anna Nagar, Chennai - 600040')
+      .split('|')
+      .map((line) => line.trim())
+      .filter(Boolean),
+    sellerState: process.env.INVOICE_SELLER_STATE || 'Tamil Nadu',
+    sellerGstin: process.env.INVOICE_SELLER_GSTIN || '33ABCDE1234F1Z5',
+    sellerPhone: process.env.INVOICE_SELLER_PHONE || '+91 98765 43210',
+    sellerEmail: process.env.INVOICE_SELLER_EMAIL || 'billing@trakwaytechnologies.com',
+    prefix: process.env.INVOICE_PREFIX || 'TW',
+    gstRate: Number(process.env.INVOICE_GST_RATE) || 18,
+    hsn: process.env.INVOICE_HSN || '8526',
+  },
   corsOrigins: (process.env.CORS_ORIGINS || '')
     .split(',')
     .map((origin) => origin.trim().replace(/\/+$/, ''))

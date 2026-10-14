@@ -4,6 +4,7 @@ const asyncHandler = require('../../../utils/asyncHandler');
 const response = require('../../../utils/response');
 const { getPagination } = require('../../../utils/pagination');
 const orderService = require('./order.service');
+const invoiceService = require('../../invoice/invoice.service');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -58,4 +59,9 @@ const update = asyncHandler(async (req, res) => {
   response.success(res, await orderService.updateNotes(parseId(req.params.id), req.body.admin_notes), 'Order updated');
 });
 
-module.exports = { list, summary, getById, setStatus, update };
+// PDF tax invoice for any order (not cancelled ones).
+const invoice = asyncHandler(async (req, res) => {
+  invoiceService.sendPdf(res, await invoiceService.getInvoicePdf(parseId(req.params.id)));
+});
+
+module.exports = { list, summary, getById, setStatus, update, invoice };

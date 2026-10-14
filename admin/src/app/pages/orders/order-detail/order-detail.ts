@@ -20,6 +20,7 @@ import { OrderService } from '../../../core/services/order.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { assetUrl } from '../../../core/utils/asset-url';
 import { getErrorMessage } from '../../../core/utils/http-error';
+import { blobErrorMessage, fileNameFrom, saveBlob } from '../../../core/utils/download';
 import { rupees } from '../../../core/utils/pricing';
 import { FIELD_BASE, fieldState } from '../../../core/utils/ui';
 import { askStatusChange } from '../order-actions';
@@ -63,6 +64,12 @@ export class OrderDetail {
   protected readonly error = signal<string | null>(null);
   protected readonly statusBusy = signal<OrderStatus | null>(null);
   protected readonly notesSaving = signal(false);
+  protected readonly invoiceBusy = signal(false);
+  // Cancelled orders never get an invoice (the API refuses them too).
+  protected readonly canInvoice = computed(() => {
+    const status = this.order()?.status;
+    return !!status && status !== 'cancelled';
+  });
 
   protected readonly notes = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(this.maxNotes)] });
   private readonly notesValue = toSignal(this.notes.valueChanges.pipe(startWith(this.notes.value)), { requireSync: true });
@@ -128,6 +135,22 @@ export class OrderDetail {
       error: (err) => {
         this.loading.set(false);
         this.error.set(getErrorMessage(err, 'Could not load the order'));
+      },
+    });
+  }
+
+  protected downloadInvoice(): void {
+    const order = this.order();
+    if (!order || this.invoiceBusy()) return;
+    this.invoiceBusy.set(true);
+    this.orderService.invoice(order.id).subscribe({
+      next: (res) => {
+        this.invoiceBusy.set(false);
+        if (res.body) saveBlob(res.body, fileNameFrom(res.headers.get('Content-Disposition'), `Invoice-${order.order_no}.pdf`));
+      },
+      error: async (err) => {
+        this.invoiceBusy.set(false);
+        this.toast.error(await blobErrorMessage(err, 'Could not download the invoice'));
       },
     });
   }

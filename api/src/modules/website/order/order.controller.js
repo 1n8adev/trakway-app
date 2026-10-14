@@ -3,6 +3,7 @@ const asyncHandler = require('../../../utils/asyncHandler');
 const response = require('../../../utils/response');
 const { getPagination } = require('../../../utils/pagination');
 const orderService = require('./order.service');
+const invoiceService = require('../../invoice/invoice.service');
 
 const summary = asyncHandler(async (req, res) => {
   response.success(res, await orderService.summary(req.customer.id, { coupon_code: req.body.coupon_code }));
@@ -29,4 +30,10 @@ const cancel = asyncHandler(async (req, res) => {
   response.success(res, order, `Order ${order.order_no} cancelled`);
 });
 
-module.exports = { summary, place, list, get, cancel };
+// PDF tax invoice for one of the customer's own orders (404 for anyone else's).
+const invoice = asyncHandler(async (req, res) => {
+  const order = await orderService.get(req.customer.id, req.params.orderNo);
+  invoiceService.sendPdf(res, await invoiceService.getInvoicePdf(order.id));
+});
+
+module.exports = { summary, place, list, get, cancel, invoice };

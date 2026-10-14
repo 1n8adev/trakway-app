@@ -5,7 +5,7 @@ const { OFFER_TYPES } = require('../../../utils/pricing');
 
 const hasTwoDecimals = (n) => Math.round(n * 100) === n * 100;
 
-const MIN_IMAGES = 2;
+const MIN_IMAGES = 1;
 const MAX_IMAGES = 10;
 const MAX_BENEFITS = 20;
 const MAX_FEATURE_LIST = 30;
@@ -249,7 +249,7 @@ function create(body) {
     errors.price = 'Set a price to add an offer';
   }
   const count = body.images?.length || 0;
-  if (count < MIN_IMAGES) errors.images = `At least ${MIN_IMAGES} images are required`;
+  if (count < MIN_IMAGES) errors.images = MIN_IMAGES === 1 ? 'At least 1 image is required' : `At least ${MIN_IMAGES} images are required`;
   else if (count > MAX_IMAGES) errors.images = `At most ${MAX_IMAGES} images are allowed`;
   return errors;
 }

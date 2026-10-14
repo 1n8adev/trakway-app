@@ -188,7 +188,9 @@ async function update(id, data) {
   const newImages = data.images || [];
   const finalCount = existing.images.length - removeIds.length + newImages.length;
   if (finalCount < MIN_IMAGES) {
-    throw ApiError.badRequest('Validation failed', { images: `A product needs at least ${MIN_IMAGES} images` });
+    throw ApiError.badRequest('Validation failed', {
+      images: `A product needs at least ${MIN_IMAGES} ${MIN_IMAGES === 1 ? 'image' : 'images'}`,
+    });
   }
   if (finalCount > MAX_IMAGES) {
     throw ApiError.badRequest('Validation failed', { images: `A product can have at most ${MAX_IMAGES} images` });

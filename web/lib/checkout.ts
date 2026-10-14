@@ -1,7 +1,7 @@
 // Checkout (Cash on Delivery) and customer orders. Browser-only; needs a
 // logged-in customer. Mirrors TrakwayAPI's modules/website/order.
 
-import { authRequest, authRequestPage, type Paginated } from './auth';
+import { authDownload, authRequest, authRequestPage, type Paginated } from './auth';
 import { toCart, type Cart, type RawCart } from './cart';
 import { toAssetUrl } from './products';
 
@@ -178,6 +178,16 @@ export async function listOrders(page = 1, limit = 10): Promise<Paginated<OrderL
       first_item: order.first_item && { ...order.first_item, image: toAssetUrl(order.first_item.image, PUBLIC_API_URL) }
     }))
   };
+}
+
+// Cancelled orders have no invoice (the API refuses them too).
+export function canDownloadInvoice(order: { status: OrderStatus }) {
+  return order.status !== 'cancelled';
+}
+
+// GET /api/orders/:orderNo/invoice — saves the PDF tax invoice.
+export function downloadInvoice(orderNo: string): Promise<void> {
+  return authDownload(`/api/orders/${encodeURIComponent(orderNo)}/invoice`, `Invoice-${orderNo}.pdf`);
 }
 
 // POST /api/orders/:orderNo/cancel — only while the order is still "placed".

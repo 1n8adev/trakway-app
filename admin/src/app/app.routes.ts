@@ -91,6 +91,11 @@ export const routes: Routes = [
         title: 'FAQs · Trakway Admin',
         loadComponent: () => import('./pages/faqs/faqs').then((m) => m.Faqs),
       },
+      {
+        path: 'client-logos',
+        title: 'Client Logos · Trakway Admin',
+        loadComponent: () => import('./pages/client-logos/client-logos').then((m) => m.ClientLogos),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

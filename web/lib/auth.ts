@@ -284,6 +284,34 @@ export function authRequest<T>(method: Method, path: string, body?: unknown): Pr
   return withAccessToken((token) => request<T>(method, path, body, token));
 }
 
+// Downloads a file from an endpoint that needs the customer's access token (e.g. an invoice PDF)
+// and saves it in the browser. The file name comes from Content-Disposition when the API sends one.
+export async function authDownload(path: string, fallbackName: string): Promise<void> {
+  const blob = await withAccessToken(async (token) => {
+    let res: Response;
+    try {
+      res = await fetch(`${PUBLIC_API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    } catch {
+      throw new AuthApiError(0, 'Could not reach the server. Please check your connection and try again.');
+    }
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new AuthApiError(res.status, json?.message ?? 'Could not download the file. Please try again.');
+    }
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(res.headers.get('Content-Disposition') ?? '');
+    return { data: await res.blob(), name: match ? decodeURIComponent(match[1]) : fallbackName };
+  });
+
+  const url = URL.createObjectURL(blob.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = blob.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export type Paginated<T> = {
   data: T[];
   pagination: { page: number; limit: number; total: number; totalPages: number };

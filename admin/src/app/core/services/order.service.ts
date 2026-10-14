@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../models/api.model';
@@ -26,6 +26,11 @@ export class OrderService {
   // Includes items.
   getById(id: number): Observable<Order> {
     return this.http.get<ApiResponse<Order>>(`${this.baseUrl}/${id}`).pipe(map((res) => res.data));
+  }
+
+  // PDF tax invoice. The full response is returned so the file name can be read from Content-Disposition.
+  invoice(id: number): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.baseUrl}/${id}/invoice`, { responseType: 'blob', observe: 'response' });
   }
 
   // Only to one of the order's next_statuses. 409 if another admin changed it first.

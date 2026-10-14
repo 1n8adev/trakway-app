@@ -17,6 +17,7 @@ ordersRouter.use(...requireCustomer);
 ordersRouter.post('/', ...body, validate(orderValidation.place), orderController.place);
 ordersRouter.get('/', orderController.list);
 ordersRouter.get('/:orderNo', orderController.get);
+ordersRouter.get('/:orderNo/invoice', orderController.invoice);
 ordersRouter.post('/:orderNo/cancel', ...body, validate(orderValidation.cancel), orderController.cancel);
 
 module.exports = { checkoutRouter, ordersRouter };

@@ -32,7 +32,7 @@ export class ProductService {
     return this.http.get<ApiResponse<ProductDetails>>(`${this.baseUrl}/${id}`).pipe(map((res) => res.data));
   }
 
-  // Tab 1 (create). The API requires at least 2 images, sent as files under "images".
+  // Tab 1 (create). The API requires at least 1 image, sent as files under "images".
   create(payload: ProductBasicPayload, images: File[]): Observable<ApiResponse<ProductDetails>> {
     return this.http.post<ApiResponse<ProductDetails>>(this.baseUrl, this.basicForm(payload, images));
   }

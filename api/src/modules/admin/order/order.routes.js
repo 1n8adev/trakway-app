@@ -11,6 +11,7 @@ const body = [formFields(), orderValidation.normalize];
 router.get('/', orderController.list);
 router.get('/summary', orderController.summary); // before /:id
 router.get('/:id', orderController.getById);
+router.get('/:id/invoice', orderController.invoice);
 router.patch('/:id/status', ...body, validate(orderValidation.status), orderController.setStatus);
 router.patch('/:id', ...body, validate(orderValidation.update), orderController.update);
 

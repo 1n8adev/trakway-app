@@ -7,6 +7,7 @@ const authRoutes = require('./auth/auth.routes');
 const addressRoutes = require('./address/address.routes');
 const cartRoutes = require('./cart/cart.routes');
 const { checkoutRouter, ordersRouter } = require('./order/order.routes');
+const clientLogoRoutes = require('./client-logo/client-logo.routes');
 
 // Storefront API, mounted at /api. Catalogue, FAQs, bookings and auth are public;
 // addresses, cart, checkout and orders need a logged-in customer (see requireCustomer).
@@ -15,6 +16,7 @@ const router = express.Router();
 router.use('/categories', categoryRoutes);
 router.use('/products', productRoutes);
 router.use('/faqs', faqRoutes);
+router.use('/client-logos', clientLogoRoutes);
 router.use('/service-bookings', serviceBookingRoutes);
 router.use('/auth', authRoutes);
 router.use('/addresses', addressRoutes);

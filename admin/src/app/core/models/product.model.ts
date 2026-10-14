@@ -171,7 +171,7 @@ export interface VariantPayload {
 
 // Limits from the API's product.validation.js.
 export const PRODUCT_LIMITS = {
-  minImages: 2,
+  minImages: 1,
   maxImages: 10,
   maxBenefits: 20,
   maxFeatureList: 30,

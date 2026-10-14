@@ -239,7 +239,9 @@ export class BasicInfoTab implements OnInit, OnDestroy {
     if (this.featureDraft().trim()) this.commitFeature();
     this.checkPricing();
     const count = this.imageCount();
-    if (count < PRODUCT_LIMITS.minImages) this.imagesError.set(`Add at least ${PRODUCT_LIMITS.minImages} images`);
+    if (count < PRODUCT_LIMITS.minImages) {
+      this.imagesError.set(`Add at least ${PRODUCT_LIMITS.minImages} ${PRODUCT_LIMITS.minImages === 1 ? 'image' : 'images'}`);
+    }
     else if (count > PRODUCT_LIMITS.maxImages) this.imagesError.set(`A product can have at most ${PRODUCT_LIMITS.maxImages} images`);
     if (this.form.invalid || this.imagesError()) {
       this.form.markAllAsTouched();
