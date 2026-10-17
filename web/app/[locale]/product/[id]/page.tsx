@@ -5,6 +5,7 @@ import { fetchProduct } from '@/lib/api';
 import ProductGallery from '@/components/product/ProductGallery';
 import ProductBenefits from '@/components/product/ProductBenefits';
 import ProductPackage from '@/components/product/ProductPackage';
+import ProductBadges from '@/components/product/ProductBadges';
 import ProductTabs from '@/components/product/ProductTabs';
 import ProductVariantPicker, { PriceLine } from '@/components/product/ProductVariantPicker';
 import AddToCart from '@/components/product/AddToCart';
@@ -27,10 +28,22 @@ export default async function ProductDetailsPage({
   if (!product) notFound();
 
   const hasVariants = product.variants.length > 0;
-  // Shipping note + divider: sits between the price and the variant options.
+  // SIM / app badges + shipping note + divider: sits between the price and the variant options.
   const details = (
     <>
-      <p className="mt-1 text-sm text-gray-500">{t('shippingNote')}</p>
+    <p className="mt-2 text-sm text-gray-500">{t('shippingNote')}</p>
+      {/* SIM included + Android / iOS app badges under the price — delete this block to remove them. */}
+      <ProductBadges
+        labels={{
+          simIncluded: t('simIncluded'),
+          simIncludedNote: t('simIncludedNote'),
+          androidApp: t('androidApp'),
+          androidAppNote: t('androidAppNote'),
+          iosApp: t('iosApp'),
+          iosAppNote: t('iosAppNote')
+        }}
+      />
+      
 
       <div className="mt-5 border-t border-dashed border-gray-300" />
     </>
@@ -99,7 +112,7 @@ export default async function ProductDetailsPage({
             )}
 
             <h2 className="mt-5 text-sm font-bold text-gray-900">{t('description')}:</h2>
-            <p className="mt-2 leading-relaxed text-gray-600">{product.description}</p>
+            <p className="mt-2 leading-relaxed text-gray-600">{product.shortDescription}</p>
 
             {/* <div className="mt-6 flex flex-wrap items-center gap-3">
               <Link

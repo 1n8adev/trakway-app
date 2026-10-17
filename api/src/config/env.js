@@ -54,6 +54,9 @@ module.exports = {
     gstRate: Number(process.env.INVOICE_GST_RATE) || 18,
     hsn: process.env.INVOICE_HSN || '8526',
   },
+  // Local dev against the live database: uploaded files live on the live server, not this disk, so
+  // /uploads requests that miss locally are redirected here (e.g. https://api.trakwaytechnologies.com).
+  uploadsFallbackUrl: (process.env.UPLOADS_FALLBACK_URL || '').trim().replace(/\/+$/, ''),
   corsOrigins: (process.env.CORS_ORIGINS || '')
     .split(',')
     .map((origin) => origin.trim().replace(/\/+$/, ''))

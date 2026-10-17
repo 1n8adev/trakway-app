@@ -22,6 +22,9 @@ app.use(express.urlencoded({ extended: true }));
 if (env.nodeEnv !== 'test') app.use(morgan('dev'));
 
 app.use('/uploads', express.static(UPLOAD_ROOT));
+if (env.uploadsFallbackUrl) {
+  app.use('/uploads', (req, res) => res.redirect(302, `${env.uploadsFallbackUrl}/uploads${req.path}`));
+}
 app.use('/api', routes);
 
 app.use(notFound);

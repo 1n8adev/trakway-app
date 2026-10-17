@@ -8,7 +8,8 @@
     "db:check": "node src/database/checkDb.js",
     "migrate": "node src/database/migrate.js",
     "seed:admin": "node src/database/seeds/createAdmin.js",
-    "mail:check": "node src/database/checkMail.js"
+    "mail:check": "node src/database/checkMail.js",
+    "dev:live": "node --env-file=.env.live.local --watch src/server.js"
   },
   "keywords": [],
   "author": "",

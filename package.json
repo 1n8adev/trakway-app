@@ -8,7 +8,9 @@
   "scripts": {
     "install:all": "npm --prefix api install && npm --prefix admin install && npm --prefix web install",
     "dev": "concurrently -k -n api,admin,web -c blue,magenta,green \"npm:dev:api\" \"npm:dev:admin\" \"npm:dev:web\"",
+    "dev:live": "concurrently -k -n api-LIVE,admin,web -c red,magenta,green \"npm:dev:api:live\" \"npm:dev:admin\" \"npm:dev:web\"",
     "dev:api": "npm --prefix api run dev",
+    "dev:api:live": "npm --prefix api run dev:live",
     "dev:admin": "npm --prefix admin start",
     "dev:web": "npm --prefix web run dev",
     "build": "npm --prefix admin run build && npm --prefix web run build",
