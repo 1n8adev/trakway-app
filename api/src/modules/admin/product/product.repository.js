@@ -6,6 +6,7 @@ const { finalPriceSql } = require('../../../utils/pricing');
 const COLUMNS = `p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.feature,
   p.short_description, p.long_description, p.feature_list, p.price, p.offer_type, p.offer_value,
   p.specifications, p.package_details, p.box_contents, p.sort_order, p.is_active,
+  p.seo_title, p.seo_keywords, p.seo_description, p.seo_canonical_url, p.seo_noindex, p.seo_scripts,
   p.created_at, p.updated_at`;
 
 // Builds the WHERE clause for list filters: search, categoryId, isActive.
@@ -122,7 +123,9 @@ async function create(data, client = db.pool) {
   return rows[0].id;
 }
 
-const UPDATABLE = INSERTABLE;
+// SEO columns are set from their own tab after the product exists (seo_noindex defaults to false).
+const UPDATABLE = [...INSERTABLE, 'seo_title', 'seo_keywords', 'seo_description', 'seo_canonical_url',
+  'seo_noindex', 'seo_scripts'];
 
 // Updates only the fields present in data.
 async function update(id, data, client = db.pool) {

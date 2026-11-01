@@ -1,4 +1,5 @@
 import { htmlToText } from './html';
+import { parseSeoScripts, type SeoScript } from './seo';
 
 // Types for the storefront's product data, plus the mapping from the backend's
 // raw JSON (snake_case, HTML fields, relative upload paths) to the shapes the
@@ -75,6 +76,17 @@ export type ProductDetails = ProductSummary & {
   // Empty when the product has no variants and sells at its base price.
   attributes: ProductAttribute[];
   variants: ProductVariant[];
+  // Admin "SEO" tab. Empty fields fall back to the product name / short description.
+  seo: ProductSeo;
+};
+
+export type ProductSeo = {
+  title: string | null;
+  keywords: string[];
+  description: string | null;
+  canonicalUrl: string | null;
+  noindex: boolean;
+  scripts: SeoScript[];
 };
 
 export type Pagination = {
@@ -107,6 +119,14 @@ export type RawProductSummary = {
 };
 
 export type RawProductDetails = RawProductSummary & {
+  seo?: {
+    title: string | null;
+    keywords: string | null;
+    description: string | null;
+    canonical_url: string | null;
+    noindex: boolean;
+    scripts: string | null;
+  } | null;
   long_description: string | null;
   feature_list: string[] | null;
   specifications: { title: string; description: string }[] | null;
@@ -189,7 +209,18 @@ export function toProductDetails(raw: RawProductDetails, baseUrl: string): Produ
       rows: parseHtmlTable(raw.box_contents),
       items: parseHtmlList(raw.box_contents)
     },
-    ...toVariantOptions(raw)
+    ...toVariantOptions(raw),
+    seo: {
+      title: raw.seo?.title?.trim() || null,
+      keywords: (raw.seo?.keywords ?? '')
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean),
+      description: raw.seo?.description?.trim() || null,
+      canonicalUrl: raw.seo?.canonical_url?.trim() || null,
+      noindex: !!raw.seo?.noindex,
+      scripts: parseSeoScripts(raw.seo?.scripts)
+    }
   };
 }
 

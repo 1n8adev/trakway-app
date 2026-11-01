@@ -1,12 +1,17 @@
 import { getTranslations } from 'next-intl/server';
 import { fetchLatestProducts } from '@/lib/api';
 import ProductCard from '@/components/ProductCard';
-import HeroVideo from '@/components/HeroVideo';
 import ClientLogos from '@/components/ClientLogos';
+import GpsDemoSection from '@/components/GpsDemoSection';
+import FleetLiveSection from '@/components/FleetLiveSection';
 import ServicesSection from '@/components/ServicesSection';
 import BookingSection from '@/components/BookingSection';
 import TestimonialsSection from '@/components/TestimonialsSection';
 import FaqSection from '@/components/FaqSection';
+import { staticPageMetadata } from '@/lib/seo';
+
+// <title>, description, canonical and Open Graph / Twitter share tags (lib/seo.ts).
+export const generateMetadata = staticPageMetadata('', null);
 
 export default async function HomePage() {
   const t = await getTranslations('Home');
@@ -14,24 +19,9 @@ export default async function HomePage() {
 
   return (
     <div>
-      {/* Hero */}
-      <section
-        className="relative left-1/2 right-1/2 -mx-[50vw] mb-12 w-screen bg-cover bg-center md:py-16 pb-0 text-center"
-        style={{ backgroundImage: "url('/images/banner-bg.png')" }}
-      >
-        <h1 className="text-4xl font-extrabold text-gray-900 lg:text-6xl">
-          <span className="block">{t('heroTitleLine1')}</span>
-          <span className="block">{t('heroTitleLine2')}</span>
-        </h1>
-        <p className="mx-auto mt-3 text-gray-900 sm:text-lg">
-          {t('heroSubtitlePart1')}
-          <span className="text-brand-600">{t('heroSubtitlePart2')}</span>
-          {t('heroSubtitlePart3')}
-        </p>
-
-        <div className="mt-8">
-          <HeroVideo />
-        </div>
+      {/* Hero: live fleet map. Previous hero backed up in backup/home-page-before-fleet-hero.tsx.bak */}
+      <section className="relative left-1/2 right-1/2 -mx-[50vw] mb-12 w-screen text-center">
+        <FleetLiveSection hero />
 
         <ClientLogos />
       </section>
@@ -58,6 +48,7 @@ export default async function HomePage() {
        
       </section>
 
+      {/* <GpsDemoSection /> */}
       <ServicesSection />
       <BookingSection />
       <TestimonialsSection />

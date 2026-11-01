@@ -30,6 +30,7 @@ router.put('/:id/benefits', ...withBenefitImages, validate(productValidation.ben
 router.put('/:id/specifications', ...withText, validate(productValidation.specifications), productController.updateSpecifications);
 router.put('/:id/package-details', ...withText, validate(productValidation.packageDetails), productController.updatePackageDetails);
 router.put('/:id/box-contents', ...withText, validate(productValidation.boxContents), productController.updateBoxContents);
+router.put('/:id/seo', ...withText, validate(productValidation.seo), productController.updateSeo);
 
 router.get('/:id/variants', productController.getVariants);
 router.put('/:id/variants', ...withText, validate(productValidation.variants), productController.updateVariants);

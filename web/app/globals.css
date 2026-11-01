@@ -81,3 +81,50 @@ html {
 .text-gray-900 {
   color: #474747;
 }
+
+/* Home GPS demo (components/GpsDemoSection.tsx): 6 benefits x 3s = 18s loop.
+   Each item gets animation-delay i*3s, so it is "on" for the first 1/6 of the cycle. */
+.gps-step {
+  animation: gps-step 18s linear infinite;
+}
+.gps-progress {
+  animation: gps-progress 18s linear infinite;
+}
+.gps-toast {
+  animation: gps-toast 18s ease-out infinite;
+}
+
+@keyframes gps-step {
+  0%, 15.5% { opacity: 1; }
+  16.67%, 100% { opacity: 0; }
+}
+@keyframes gps-progress {
+  0% { transform: scaleX(0); }
+  16.6% { transform: scaleX(1); }
+  16.67%, 100% { transform: scaleX(0); }
+}
+@keyframes gps-toast {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  2%, 14.5% { opacity: 1; transform: none; }
+  16.67%, 100% { opacity: 0; transform: translateY(-8px) scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gps-step, .gps-progress, .gps-toast { animation: none; }
+}
+
+/* Home fleet section (components/FleetLiveSection.tsx): alert feed scrolls upward forever.
+   The list is rendered twice, so moving it by -50% lands exactly on the start again. */
+.fleet-feed {
+  animation: fleet-feed 28s linear infinite;
+}
+.fleet-feed:hover {
+  animation-play-state: paused;
+}
+@keyframes fleet-feed {
+  to { transform: translateY(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fleet-feed { animation: none; }
+}

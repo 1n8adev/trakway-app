@@ -4,6 +4,10 @@ import { Link } from '@/i18n/navigation';
 import MissionNav from '@/components/about/MissionNav';
 import CardCarousel from '@/components/about/CardCarousel';
 import { BookServiceIconGlyph, type BookServiceIcon } from '@/components/book-service/icons';
+import { staticPageMetadata } from '@/lib/seo';
+
+// <title>, description, canonical and Open Graph / Twitter share tags (lib/seo.ts).
+export const generateMetadata = staticPageMetadata('/about', 'about');
 
 const CLIENT_LOGOS = [1, 2, 3, 4, 5, 6, 7].map((n) => `/images/clients/client${n}.png`);
 

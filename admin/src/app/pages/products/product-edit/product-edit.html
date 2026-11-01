@@ -117,6 +117,9 @@
       @case ('combinations') {
         <app-product-combinations [product]="product()!" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
       }
+      @case ('seo') {
+        <app-product-seo [product]="product()!" (saved)="onSaved($event)" (dirtyChange)="dirty.set($event)" />
+      }
     }
   </div>
 }

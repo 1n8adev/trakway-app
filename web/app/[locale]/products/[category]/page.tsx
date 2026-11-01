@@ -3,21 +3,25 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { fetchCategories, fetchProducts, findCategoryBySlug } from "@/lib/api";
 import ProductCatalog from "@/components/products/ProductCatalog";
+import { pageMetadata } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ category: string }>;
+  params: Promise<{ locale: string; category: string }>;
 }): Promise<Metadata> {
-  const { category: slug } = await params;
+  const { locale, category: slug } = await params;
   const category = findCategoryBySlug(await fetchCategories(), slug);
 
   if (!category) return {};
 
-  return {
+  const t = await getTranslations({ locale, namespace: "Meta" });
+  return pageMetadata({
+    locale,
+    path: `/products/${category.slug}`,
     title: category.name,
-    description: `Browse Trakway ${category.name} devices — pricing, specifications and features.`,
-  };
+    description: t("categoryDescription", { name: category.name }),
+  });
 }
 
 export default async function ProductCategoryPage({

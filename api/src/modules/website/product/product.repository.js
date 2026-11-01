@@ -75,6 +75,7 @@ async function findBySlug(slug) {
     `WITH RECURSIVE ${VISIBLE_CATEGORIES_CTE}
      SELECT p.id, p.name, p.slug, p.feature, p.short_description, p.long_description, p.feature_list,
        p.price, p.offer_type, p.offer_value, p.specifications, p.package_details, p.box_contents,
+       p.seo_title, p.seo_keywords, p.seo_description, p.seo_canonical_url, p.seo_noindex, p.seo_scripts,
        c.id AS category_id, c.name AS category_name, c.slug AS category_slug
      FROM products p JOIN categories c ON c.id = p.category_id
      WHERE p.slug = $1 AND ${visibleProduct('p')}`,

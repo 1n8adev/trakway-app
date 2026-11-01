@@ -173,6 +173,9 @@ async function update(id, data) {
   if (data.specifications !== undefined) changes.specifications = cleanSpecifications(data.specifications);
   if (data.package_details !== undefined) changes.package_details = cleanHtml(data.package_details);
   if (data.box_contents !== undefined) changes.box_contents = cleanHtml(data.box_contents);
+  for (const key of ['seo_title', 'seo_keywords', 'seo_description', 'seo_canonical_url', 'seo_scripts']) {
+    if (typeof data[key] === 'string') changes[key] = data[key].trim() || null;
+  }
   await assertUnique({ name: changes.name, slug: changes.slug }, id);
   if (data.category_id !== undefined) await assertCategoryExists(data.category_id);
 

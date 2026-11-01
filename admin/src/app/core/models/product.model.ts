@@ -106,6 +106,12 @@ export interface ProductDetails {
   specifications: ProductSpecification[];
   package_details: string | null;
   box_contents: string | null;
+  seo_title: string | null;
+  seo_keywords: string | null;
+  seo_description: string | null;
+  seo_canonical_url: string | null;
+  seo_noindex: boolean;
+  seo_scripts: string | null;
   price: number | null;
   offer_type: OfferType | null;
   offer_value: number | null;
@@ -168,6 +174,27 @@ export interface VariantPayload {
   sku: string | null;
   is_active: boolean;
 }
+
+// SEO tab (PUT /:id/seo). Empty strings clear a field; the website then falls back to defaults.
+export interface ProductSeoPayload {
+  seo_title: string | null;
+  seo_keywords: string | null;
+  seo_description: string | null;
+  seo_canonical_url: string | null;
+  seo_noindex: boolean;
+  seo_scripts: string | null;
+}
+
+// Column limits from the API's 017_add_product_seo.sql, plus the lengths Google shows in results.
+export const SEO_LIMITS = {
+  titleMax: 160,
+  titleIdeal: 60,
+  keywordsMax: 500,
+  descriptionMax: 320,
+  descriptionIdeal: 160,
+  canonicalMax: 500,
+  scriptsMax: 10000,
+} as const;
 
 // Limits from the API's product.validation.js.
 export const PRODUCT_LIMITS = {

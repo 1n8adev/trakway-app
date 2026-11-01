@@ -2,6 +2,7 @@
 const ApiError = require('../../../utils/ApiError');
 const { toIntOrNull, toInt, toBool, toStringOrNull, toList, parseJson } = require('../../../utils/formData');
 const { OFFER_TYPES } = require('../../../utils/pricing');
+const { scriptsError } = require('../../../utils/seoScripts');
 
 const hasTwoDecimals = (n) => Math.round(n * 100) === n * 100;
 
@@ -28,7 +29,11 @@ const FIELDS = {
   packageDetails: ['package_details'],
   boxContents: ['box_contents'],
   variants: ['variants'],
+  seo: ['seo_title', 'seo_keywords', 'seo_description', 'seo_canonical_url', 'seo_noindex', 'seo_scripts'],
 };
+
+// Column limits from migration 017_add_product_seo.sql.
+const SEO_LIMITS = { seo_title: 160, seo_keywords: 500, seo_description: 320, seo_canonical_url: 500 };
 
 const MAX_VARIANTS = 200;
 const MAX_PRICE = 9999999999.99;
@@ -61,9 +66,11 @@ function normalize(req, res, next) {
   if (body.category_id !== undefined) body.category_id = toIntOrNull(body.category_id);
   if (body.sort_order !== undefined) body.sort_order = toInt(body.sort_order);
   if (body.is_active !== undefined) body.is_active = toBool(body.is_active);
-  for (const key of ['feature', 'short_description', 'long_description', 'package_details', 'box_contents']) {
+  for (const key of ['feature', 'short_description', 'long_description', 'package_details', 'box_contents',
+    'seo_title', 'seo_keywords', 'seo_description', 'seo_canonical_url', 'seo_scripts']) {
     if (body[key] !== undefined) body[key] = toStringOrNull(body[key]);
   }
+  if (body.seo_noindex !== undefined) body.seo_noindex = toBool(body.seo_noindex);
   if (body.feature_list !== undefined) body.feature_list = toList(body.feature_list);
   normalizePrice(body);
   if (body.specifications !== undefined) {
@@ -301,6 +308,31 @@ function boxContents(body) {
   return errors;
 }
 
+// PUT /products/:id/seo — every field optional; empty clears it (the website then uses defaults).
+function seo(body) {
+  const errors = {};
+  if (!FIELDS.seo.some((key) => body[key] !== undefined)) {
+    errors.body = `Provide at least one of: ${FIELDS.seo.join(', ')}`;
+    return errors;
+  }
+  for (const [key, max] of Object.entries(SEO_LIMITS)) {
+    const value = body[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== 'string') errors[key] = `${key} must be text`;
+    else if (value.trim().length > max) errors[key] = `Must be at most ${max} characters`;
+  }
+  const url = body.seo_canonical_url;
+  if (typeof url === 'string' && url.trim() && !/^https?:\/\/[^\s]+$/i.test(url.trim())) {
+    errors.seo_canonical_url = 'Canonical URL must start with https://';
+  }
+  if (body.seo_noindex !== undefined && typeof body.seo_noindex !== 'boolean') {
+    errors.seo_noindex = 'seo_noindex must be true or false';
+  }
+  const scriptProblem = scriptsError(body.seo_scripts);
+  if (scriptProblem) errors.seo_scripts = scriptProblem;
+  return errors;
+}
+
 // Optional offer: offer_type 'price' (offer_value = selling price, below price)
 // or 'percentage' (offer_value = % off, more than 0 and below 100). No offer_type = no offer.
 // `key` prefixes error names ("variants[0]" -> "variants[0].offer_value"; "" -> "offer_value").
@@ -390,5 +422,6 @@ module.exports = {
   specifications,
   packageDetails,
   boxContents,
+  seo,
   status,
 };

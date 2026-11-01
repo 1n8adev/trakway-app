@@ -1,0 +1,161 @@
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <div class="mb-5">
+    <h3 class="text-[16px] font-semibold text-gray-800">SEO</h3>
+    <p class="text-[14px] text-gray-500">
+      How this product appears in Google and when shared. Empty fields use the product name and short description.
+    </p>
+  </div>
+
+  @if (error()) {
+    <div class="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+  }
+
+  <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div class="space-y-5">
+      <!-- Meta title -->
+      <div>
+        <div class="mb-2 flex items-baseline justify-between gap-3">
+          <label for="seo-title" class="text-[15px] text-gray-700">Meta title</label>
+          <span class="text-[13px]" [class]="counterClass(titleLength(), limits.titleIdeal)">{{ titleLength() }} / {{ limits.titleIdeal }}</span>
+        </div>
+        <input
+          id="seo-title"
+          formControlName="seo_title"
+          [maxlength]="limits.titleMax"
+          [placeholder]="product().name"
+          class="h-[46px] w-full rounded-md border bg-white px-4 text-[16px] text-gray-800 outline-none transition placeholder:text-gray-400 focus:ring-2"
+          [class]="inputClass('seo_title')"
+        />
+        @if (fieldError('seo_title'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        } @else {
+          <p class="mt-1.5 text-[13px] text-gray-400">Shown as the blue link in Google. About {{ limits.titleIdeal }} characters fit.</p>
+        }
+      </div>
+
+      <!-- Meta keywords -->
+      <div>
+        <label for="seo-keywords" class="mb-2 block text-[15px] text-gray-700">Meta keywords</label>
+        <input
+          id="seo-keywords"
+          formControlName="seo_keywords"
+          [maxlength]="limits.keywordsMax"
+          placeholder="e.g. gps tracker, vehicle tracking, bike tracker"
+          class="h-[46px] w-full rounded-md border bg-white px-4 text-[16px] text-gray-800 outline-none transition placeholder:text-gray-400 focus:ring-2"
+          [class]="inputClass('seo_keywords')"
+        />
+        @if (fieldError('seo_keywords'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        } @else {
+          <p class="mt-1.5 text-[13px] text-gray-400">Comma separated. Google ignores this tag, but some other search engines read it.</p>
+        }
+      </div>
+
+      <!-- Meta description -->
+      <div>
+        <div class="mb-2 flex items-baseline justify-between gap-3">
+          <label for="seo-description" class="text-[15px] text-gray-700">Meta description</label>
+          <span class="text-[13px]" [class]="counterClass(descriptionLength(), limits.descriptionIdeal)">
+            {{ descriptionLength() }} / {{ limits.descriptionIdeal }}
+          </span>
+        </div>
+        <textarea
+          id="seo-description"
+          formControlName="seo_description"
+          rows="3"
+          [maxlength]="limits.descriptionMax"
+          [placeholder]="product().short_description || 'Short summary shown under the title in Google'"
+          class="w-full resize-y rounded-md border bg-white px-4 py-3 text-[16px] text-gray-800 outline-none transition placeholder:text-gray-400 focus:ring-2"
+          [class]="inputClass('seo_description')"
+        ></textarea>
+        @if (fieldError('seo_description'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        } @else {
+          <p class="mt-1.5 text-[13px] text-gray-400">Shown under the title in Google and in link previews. About {{ limits.descriptionIdeal }} characters fit.</p>
+        }
+      </div>
+
+      <!-- Canonical URL -->
+      <div>
+        <label for="seo-canonical" class="mb-2 block text-[15px] text-gray-700">Canonical URL <span class="text-gray-400">(optional)</span></label>
+        <input
+          id="seo-canonical"
+          formControlName="seo_canonical_url"
+          [maxlength]="limits.canonicalMax"
+          [placeholder]="siteUrl + '/en/product/' + product().slug"
+          class="h-[46px] w-full rounded-md border bg-white px-4 text-[16px] text-gray-800 outline-none transition placeholder:text-gray-400 focus:ring-2"
+          [class]="inputClass('seo_canonical_url')"
+        />
+        @if (fieldError('seo_canonical_url'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        } @else {
+          <p class="mt-1.5 text-[13px] text-gray-400">Only if this product duplicates another page. Leave empty to use this product's own URL.</p>
+        }
+      </div>
+
+      <!-- Hide from search -->
+      <label class="flex cursor-pointer items-start gap-3 rounded-md border border-gray-200 p-4">
+        <input type="checkbox" formControlName="seo_noindex" class="mt-0.5 h-[18px] w-[18px] cursor-pointer rounded accent-brand-500" />
+        <span>
+          <span class="block text-[15px] font-medium text-gray-800">Hide this product from search engines</span>
+          <span class="block text-[13px] text-gray-500">Adds "noindex" so Google won't list this page. The product stays visible on the website.</span>
+        </span>
+      </label>
+
+      <!-- Scripts -->
+      <div>
+        <label for="seo-scripts" class="mb-2 block text-[15px] text-gray-700">Google tag / tracking scripts <span class="text-gray-400">(optional)</span></label>
+        <textarea
+          id="seo-scripts"
+          formControlName="seo_scripts"
+          rows="8"
+          spellcheck="false"
+          [maxlength]="limits.scriptsMax"
+          placeholder='<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXX"></script>&#10;<script>&#10;  window.dataLayer = window.dataLayer || [];&#10;  function gtag(){dataLayer.push(arguments);}&#10;  gtag("js", new Date());&#10;  gtag("config", "G-XXXXXXX");&#10;</script>'
+          class="w-full resize-y rounded-md border bg-white px-4 py-3 font-mono text-[13px] leading-relaxed text-gray-800 outline-none transition placeholder:text-gray-400 focus:ring-2"
+          [class]="inputClass('seo_scripts')"
+        ></textarea>
+        @if (fieldError('seo_scripts'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        } @else {
+          <p class="mt-1.5 text-[13px] text-gray-400">
+            Added to this product's page only. Paste &lt;script&gt; tags as given by Google (external scripts must be https).
+          </p>
+        }
+      </div>
+    </div>
+
+    <!-- Google preview -->
+    <aside class="lg:sticky lg:top-6 lg:self-start">
+      <p class="mb-2 text-[13px] font-medium tracking-wide text-gray-500 uppercase">Google preview</p>
+      <div class="rounded-md border border-gray-200 bg-white p-4">
+        <p class="truncate text-[13px] text-gray-600">{{ preview().url }}</p>
+        <p class="mt-1 line-clamp-2 text-[19px] leading-snug text-[#1a0dab]">{{ preview().title }}</p>
+        <p class="mt-1 line-clamp-3 text-[14px] leading-snug text-gray-600">
+          {{ preview().description || 'Add a meta description or short description to control this text.' }}
+        </p>
+      </div>
+      @if (form.controls.seo_noindex.value) {
+        <p class="mt-2 text-[13px] text-amber-600">Hidden from search engines — this page won't appear in Google.</p>
+      }
+    </aside>
+  </div>
+
+  <div class="mt-6 flex justify-end border-t border-gray-200 pt-5">
+    <button
+      type="submit"
+      [disabled]="saving()"
+      class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      @if (saving()) {
+        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.3" stroke-width="3" />
+          <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+        </svg>
+        Saving…
+      } @else {
+        Save SEO
+      }
+    </button>
+  </div>
+</form>

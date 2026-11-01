@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
-import { getMessages } from 'next-intl/server';
+import { getMessages, getTranslations } from 'next-intl/server';
+import { SITE_NAME, SITE_URL, pageMetadata } from '@/lib/seo';
 import { notFound } from 'next/navigation';
 import { routing, type Locale } from '@/i18n/routing';
 import Header from '@/components/Header';
+import PreHeader from '@/components/PreHeader';
 import Footer from '@/components/Footer';
 import FloatingActions from '@/components/FloatingActions';
 import '../globals.css';
@@ -19,17 +21,28 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
-export const metadata: Metadata = {
-  title: {
-    template: '%s | Trakway Technologies',
-    default: 'Trakway Technologies – GPS Vehicle Tracking Solutions'
-  },
-  icons: {
-    icon: '/images/favicon.png'
-  },
-  // TEMPORARY: keep the site out of search engines until launch. Remove this line to allow indexing.
-  robots: { index: false }
-};
+// Site-wide defaults. Public pages override title/description/Open Graph via pageMetadata()
+// (lib/seo.ts); private pages (account, cart, checkout) inherit these share tags.
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'Meta' });
+  const home = pageMetadata({ locale, path: '', title: t('siteTitle'), description: t('siteDescription') });
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: {
+      template: `%s | ${SITE_NAME}`,
+      default: t('siteTitle')
+    },
+    description: t('siteDescription'),
+    openGraph: home.openGraph,
+    twitter: home.twitter,
+    icons: {
+      icon: '/images/favicon.png'
+    },
+    // TEMPORARY: keep the site out of search engines until launch. Remove this line to allow indexing.
+    robots: { index: false }
+  };
+}
 
 // Pages under here call the backend API at request time (live stock/price
 // data), which can't be resolved during `next build` since no server is
@@ -57,6 +70,7 @@ export default async function LocaleLayout({
     <html lang={locale} className={plusJakartaSans.variable}>
       <body className="min-h-screen overflow-x-hidden antialiased">
         <NextIntlClientProvider locale={locale as Locale} messages={messages}>
+          <PreHeader />
           <Header />
           <main className="mx-auto py-0">{children}</main>
           <Footer />

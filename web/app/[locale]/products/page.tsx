@@ -1,6 +1,10 @@
 import { getTranslations } from "next-intl/server";
 import { fetchCategories, fetchProducts } from "@/lib/api";
 import ProductCatalog from "@/components/products/ProductCatalog";
+import { staticPageMetadata } from "@/lib/seo";
+
+// <title>, description, canonical and Open Graph / Twitter share tags (lib/seo.ts).
+export const generateMetadata = staticPageMetadata("/products", "products");
 
 export default async function ProductListPage({
   searchParams,

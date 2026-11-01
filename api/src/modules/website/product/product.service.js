@@ -53,9 +53,15 @@ async function getBySlug(slug) {
   }));
 
   const finals = variants.map((v) => v.final_price);
-  const details = formatProduct(product, variants.length);
+  const {
+    seo_title: title, seo_keywords: keywords, seo_description: description,
+    seo_canonical_url: canonicalUrl, seo_noindex: noindex, seo_scripts: scripts, ...row
+  } = product;
+  const details = formatProduct(row, variants.length);
   return {
     ...details,
+    // Admin "SEO" tab; null fields fall back to the product name / short description on the website.
+    seo: { title, keywords, description, canonical_url: canonicalUrl, noindex, scripts },
     min_price: details.has_variants ? Math.min(...finals) : details.final_price,
     max_price: details.has_variants ? Math.max(...finals) : details.final_price,
     images,

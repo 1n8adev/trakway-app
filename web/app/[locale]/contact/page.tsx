@@ -1,5 +1,9 @@
 import { useTranslations } from 'next-intl';
 import ContactForm from '@/components/ContactForm';
+import { staticPageMetadata } from '@/lib/seo';
+
+// <title>, description, canonical and Open Graph / Twitter share tags (lib/seo.ts).
+export const generateMetadata = staticPageMetadata('/contact', 'contact');
 
 export default function ContactPage() {
   const t = useTranslations('Contact');

@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import Script from 'next/script';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
@@ -12,20 +14,68 @@ import AddToCart from '@/components/product/AddToCart';
 import FaqSection from '@/components/FaqSection';
 import { SignalIcon, CheckIcon, WhatsAppIcon } from '@/components/product/icons';
 import { CONTACT_PHONE, whatsappUrl } from '@/lib/contact';
+import { SITE_URL, pageMetadata } from '@/lib/seo';
+import type { ProductDetails } from '@/lib/products';
 
+type Params = Promise<{ locale: string; id: string }>;
 
-export default async function ProductDetailsPage({
-  params
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+const productUrl = (locale: string, slug: string) => `${SITE_URL}/${locale}/product/${slug}`;
+
+// <head> tags from the admin "SEO" tab, falling back to the product name / short description.
+// fetchProduct is cached, so the page below reuses this request.
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { locale, id } = await params;
+  const product = await fetchProduct(id);
+  if (!product) return {};
+
+  const { seo } = product;
+  // A custom SEO title is used as-is; otherwise "<name> | Trakway Technologies". The share image is
+  // the product's main photo.
+  return pageMetadata({
+    locale,
+    path: `/product/${product.slug}`,
+    title: seo.title ?? product.name,
+    absoluteTitle: !!seo.title,
+    description: seo.description ?? (product.shortDescription || undefined),
+    keywords: seo.keywords,
+    canonical: seo.canonicalUrl ?? undefined,
+    noindex: seo.noindex,
+    images: product.images.slice(0, 1).map((src) => ({ url: src, alt: product.name }))
+  });
+}
+
+// schema.org Product data so search engines can show price and availability.
+function productJsonLd(product: ProductDetails, url: string) {
+  const prices = product.variants.length ? product.variants.map((v) => v.price) : [product.price];
+  const low = Math.min(...prices);
+  const high = Math.max(...prices);
+  const offer = { priceCurrency: 'INR', availability: 'https://schema.org/InStock', url };
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.seo.description ?? product.shortDescription,
+    image: product.images,
+    brand: { '@type': 'Brand', name: 'Trakway' },
+    ...(product.category && { category: product.category.name }),
+    offers:
+      low === high
+        ? { '@type': 'Offer', price: low, ...offer }
+        : { '@type': 'AggregateOffer', lowPrice: low, highPrice: high, offerCount: prices.length, ...offer }
+  };
+}
+
+export default async function ProductDetailsPage({ params }: { params: Params }) {
+  const { locale, id } = await params;
   const t = await getTranslations('ProductDetails');
 
   // GET /api/products/{slug} — returns null on a 404, which we turn into Next's not-found page.
   const product = await fetchProduct(id);
 
   if (!product) notFound();
+
+  // JSON-LD is serialized server-side; "<" is escaped so product text can't close the <script> tag.
+  const jsonLd = JSON.stringify(productJsonLd(product, productUrl(locale, product.slug))).replace(/</g, '\\u003c');
 
   const hasVariants = product.variants.length > 0;
   // SIM / app badges + shipping note + divider: sits between the price and the variant options.
@@ -66,6 +116,17 @@ export default async function ProductDetailsPage({
   return (
 
     <div>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+    {/* Admin "SEO" tab → Google tag / tracking scripts (validated by the API: <script> tags only, https src). */}
+    {product.seo.scripts.map((s, i) =>
+      s.src ? (
+        <Script key={`seo-src-${i}`} id={s.id} src={s.src} strategy="afterInteractive" />
+      ) : (
+        <Script key={`seo-inline-${i}`} id={s.id ?? `product-seo-script-${i}`} type={s.type} strategy="afterInteractive">
+          {s.content}
+        </Script>
+      )
+    )}
     <div className="bg-gray-bread">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
         <Link href={backHref} className="mb-4 inline-block text-sm text-gray-500 hover:text-brand-600 hover:underline">

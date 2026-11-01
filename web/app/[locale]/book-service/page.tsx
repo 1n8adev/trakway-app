@@ -2,6 +2,10 @@ import { Fragment } from 'react';
 import BookServiceForm from '@/components/book-service/BookServiceForm';
 import { fetchServiceBookingOptions } from '@/lib/api';
 import { BookServiceIconGlyph, type BookServiceIcon } from '@/components/book-service/icons';
+import { staticPageMetadata } from '@/lib/seo';
+
+// <title>, description, canonical and Open Graph / Twitter share tags (lib/seo.ts).
+export const generateMetadata = staticPageMetadata('/book-service', 'bookService');
 
 const introItems: { icon: BookServiceIcon; title: string; description: string }[] = [
   { icon: 'wrench', title: 'Expert Installation', description: 'Trained professionals at your service' },

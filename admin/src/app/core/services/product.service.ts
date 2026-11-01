@@ -9,6 +9,7 @@ import {
   ProductDetails,
   ProductFilters,
   ProductListItem,
+  ProductSeoPayload,
   ProductSpecification,
   ProductVariantsResponse,
   VariantPayload,
@@ -68,6 +69,11 @@ export class ProductService {
   // Tab 5. null clears it.
   updateBoxContents(id: number, html: string | null): Observable<ApiResponse<ProductDetails>> {
     return this.http.put<ApiResponse<ProductDetails>>(`${this.baseUrl}/${id}/box-contents`, { box_contents: html });
+  }
+
+  // SEO tab.
+  updateSeo(id: number, payload: ProductSeoPayload): Observable<ApiResponse<ProductDetails>> {
+    return this.http.put<ApiResponse<ProductDetails>>(`${this.baseUrl}/${id}/seo`, payload);
   }
 
   // Tab 6. Unlike the other tabs this returns { attributes, variants }, not the product.

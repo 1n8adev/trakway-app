@@ -1,4 +1,8 @@
 import { getTranslations } from 'next-intl/server';
+import { staticPageMetadata } from '@/lib/seo';
+
+// <title>, description, canonical and Open Graph / Twitter share tags (lib/seo.ts).
+export const generateMetadata = staticPageMetadata('/privacy-policy', 'privacy');
 
 export default async function PrivacyPolicyPage() {
   const t = await getTranslations('PrivacyPolicy');

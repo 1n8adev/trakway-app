@@ -59,6 +59,7 @@ const updateBenefits = updateTab(FIELDS.benefits, 'Benefits updated');
 const updateSpecifications = updateTab(FIELDS.specifications, 'Specifications updated');
 const updatePackageDetails = updateTab(FIELDS.packageDetails, 'Package details updated');
 const updateBoxContents = updateTab(FIELDS.boxContents, 'Box contents updated');
+const updateSeo = updateTab(FIELDS.seo, 'SEO updated');
 
 // Tab: Combinations — { attributes, variants } for one product.
 const getVariants = asyncHandler(async (req, res) => {
@@ -90,6 +91,7 @@ module.exports = {
   updateSpecifications,
   updatePackageDetails,
   updateBoxContents,
+  updateSeo,
   getVariants,
   updateVariants,
   setStatus,
