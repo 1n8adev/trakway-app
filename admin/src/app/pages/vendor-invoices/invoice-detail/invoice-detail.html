@@ -1,0 +1,386 @@
+<!-- Header -->
+<div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+  <div class="min-w-0">
+    <a routerLink="/vendor-invoices" class="mb-1 inline-flex items-center gap-1 text-[14px] text-gray-500 hover:text-brand-500">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      Vendor Invoices
+    </a>
+    @if (invoice(); as inv) {
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 class="text-[22px] font-semibold text-gray-800">{{ inv.invoice_no }}</h1>
+        @if (inv.status === 'cancelled') {
+          <span class="rounded bg-gray-100 px-2.5 py-1 text-[13px] font-medium text-gray-600">Cancelled</span>
+        } @else {
+          <span class="rounded px-2.5 py-1 text-[13px] font-medium" [class]="PAYMENT_STATUS_BADGE[inv.payment_status]">{{ PAYMENT_STATUS_LABEL[inv.payment_status] }}</span>
+          @if (overdue()) {
+            <span class="rounded bg-red-50 px-2.5 py-1 text-[13px] font-medium text-red-600">Overdue</span>
+          }
+        }
+      </div>
+      <p class="text-[14px] text-gray-500">
+        Dated {{ formatIsoDate(inv.invoice_date) }}
+        @if (inv.due_date) {
+          · Due {{ formatIsoDate(inv.due_date) }}
+        }
+        @if (inv.created_by_name) {
+          · Created by {{ inv.created_by_name }}
+        }
+      </p>
+    } @else {
+      <h1 class="text-[22px] font-semibold text-gray-800">Invoice</h1>
+    }
+  </div>
+
+  @if (invoice(); as inv) {
+    <div class="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        (click)="downloadPdf()"
+        [disabled]="pdfBusy()"
+        class="flex h-[42px] items-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-5 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 disabled:opacity-70"
+      >
+        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M5 21h14" />
+        </svg>
+        {{ pdfBusy() ? 'Preparing…' : 'Download PDF' }}
+      </button>
+      @if (isIssued()) {
+        <a
+          [routerLink]="['/vendor-invoices', inv.id, 'edit']"
+          class="flex h-[42px] items-center gap-2 rounded-md border border-gray-300 bg-white px-4 text-[15px] font-medium text-gray-700 transition hover:border-brand-600 hover:text-brand-600"
+        >
+          Edit
+        </a>
+        <button
+          type="button"
+          (click)="confirmCancel()"
+          [disabled]="cancelBusy()"
+          [title]="inv.amount_paid > 0 ? 'Remove payments before cancelling' : ''"
+          class="h-[42px] rounded-md bg-red-50 px-5 text-[15px] font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+        >
+          {{ cancelBusy() ? 'Cancelling…' : 'Cancel Invoice' }}
+        </button>
+      }
+    </div>
+  }
+</div>
+
+@if (loading()) {
+  <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+    <div class="h-96 animate-pulse rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:col-span-2"></div>
+    <div class="h-72 animate-pulse rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]"></div>
+  </div>
+} @else if (error()) {
+  <div class="rounded-md bg-white px-6 py-14 text-center shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    <p class="text-red-600">{{ error() }}</p>
+    <a routerLink="/vendor-invoices" class="mt-2 inline-block font-medium text-brand-500 hover:underline">Back to invoices</a>
+  </div>
+} @else if (invoice(); as inv) {
+  <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
+    <!-- Invoice -->
+    <div class="space-y-5 lg:col-span-2">
+      <section class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="mb-1 text-[12px] font-medium tracking-wider text-brand-600 uppercase">Billed to</p>
+            <p class="text-[17px] font-semibold text-gray-800">{{ inv.bill_name }}</p>
+            @if (inv.bill_contact_person) {
+              <p class="text-[14px] text-gray-600">Attn: {{ inv.bill_contact_person }}</p>
+            }
+            <p class="text-[14px] text-gray-500">{{ inv.bill_address }}</p>
+            <p class="text-[14px] text-gray-500">{{ inv.bill_city }}, {{ inv.bill_state }} - {{ inv.bill_pincode }}</p>
+            <p class="text-[14px] text-gray-500">
+              <a [href]="'tel:+91' + inv.bill_mobile" class="hover:text-brand-500">+91 {{ inv.bill_mobile }}</a>
+              @if (inv.bill_email) {
+                · <a [href]="'mailto:' + inv.bill_email" class="hover:text-brand-500">{{ inv.bill_email }}</a>
+              }
+            </p>
+            <p class="mt-1 font-mono text-[13px] text-gray-600">{{ inv.bill_gstin ? 'GSTIN ' + inv.bill_gstin : 'No GSTIN' }}</p>
+          </div>
+          <div class="text-right text-[14px]">
+            <p class="text-gray-500">Place of supply</p>
+            <p class="font-medium text-gray-800">{{ inv.bill_state }}</p>
+            <p class="mt-2 inline-block rounded bg-gray-100 px-2 py-0.5 text-[13px] text-gray-600">{{ inv.intra_state ? 'CGST + SGST' : 'IGST' }}</p>
+            <p class="mt-2">
+              <a routerLink="/vendor-invoices" [queryParams]="{ vendor_id: inv.vendor_id }" class="text-[13px] font-medium text-brand-500 hover:underline">All invoices for this vendor</a>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[720px] text-left text-[15px]">
+            <thead>
+              <tr class="border-b border-gray-200 text-[12px] font-medium tracking-wide text-gray-600 uppercase">
+                <th class="py-3 pl-5 font-medium lg:pl-6">#</th>
+                <th class="px-3 py-3 font-medium">Description</th>
+                <th class="px-3 py-3 font-medium">HSN/SAC</th>
+                <th class="px-3 py-3 text-right font-medium">Qty</th>
+                <th class="px-3 py-3 text-right font-medium">Rate</th>
+                <th class="px-3 py-3 text-right font-medium">GST</th>
+                <th class="py-3 pr-5 pl-3 text-right font-medium lg:pr-6">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of inv.items; track item.id; let i = $index) {
+                <tr class="border-b border-gray-100 align-top">
+                  <td class="py-3 pl-5 text-gray-500 lg:pl-6">{{ i + 1 }}</td>
+                  <td class="px-3 py-3">
+                    <p class="font-medium text-gray-800">{{ item.description }}</p>
+                    @if (item.product_id) {
+                      <a [routerLink]="['/products', item.product_id, 'edit']" class="text-[12px] text-brand-500 hover:underline">Catalog product</a>
+                    }
+                  </td>
+                  <td class="px-3 py-3 text-gray-600">{{ item.hsn_sac || '—' }}</td>
+                  <td class="px-3 py-3 text-right text-gray-700">{{ item.quantity }}</td>
+                  <td class="px-3 py-3 text-right text-gray-700">{{ rupees(item.unit_price) }}</td>
+                  <td class="px-3 py-3 text-right text-gray-700">
+                    {{ item.gst_rate }}%
+                    <p class="text-[12px] text-gray-400">{{ rupees(item.tax_amount) }}</p>
+                  </td>
+                  <td class="py-3 pr-5 pl-3 text-right font-medium text-gray-800 lg:pr-6">{{ rupees(item.taxable_value) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex flex-col gap-5 border-t border-gray-200 px-5 py-5 sm:flex-row sm:justify-between lg:px-6">
+          <div class="max-w-md space-y-3 text-[14px]">
+            @if (inv.notes) {
+              <div>
+                <p class="text-[12px] font-medium tracking-wider text-gray-400 uppercase">Notes</p>
+                <p class="whitespace-pre-line text-gray-700">{{ inv.notes }}</p>
+              </div>
+            }
+            <div>
+              <p class="text-[12px] font-medium tracking-wider text-gray-400 uppercase">Terms</p>
+              @if (inv.terms) {
+                <p class="whitespace-pre-line text-gray-700">{{ inv.terms }}</p>
+              } @else {
+                <p class="text-gray-500">Default terms are printed on the PDF.</p>
+              }
+            </div>
+          </div>
+          <dl class="w-full space-y-2 text-[15px] sm:w-72">
+            <div class="flex justify-between">
+              <dt class="text-gray-500">Subtotal</dt>
+              <dd class="text-gray-800">{{ rupees(inv.subtotal) }}</dd>
+            </div>
+            @for (g of inv.tax_summary; track g.rate) {
+              @if (g.tax > 0) {
+                @if (inv.intra_state) {
+                  <div class="flex justify-between">
+                    <dt class="text-gray-500">CGST &#64; {{ g.rate / 2 }}%</dt>
+                    <dd class="text-gray-800">{{ rupees(g.cgst) }}</dd>
+                  </div>
+                  <div class="flex justify-between">
+                    <dt class="text-gray-500">SGST &#64; {{ g.rate / 2 }}%</dt>
+                    <dd class="text-gray-800">{{ rupees(g.sgst) }}</dd>
+                  </div>
+                } @else {
+                  <div class="flex justify-between">
+                    <dt class="text-gray-500">IGST &#64; {{ g.rate }}%</dt>
+                    <dd class="text-gray-800">{{ rupees(g.igst) }}</dd>
+                  </div>
+                }
+              }
+            }
+            @if (inv.round_off) {
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Round off</dt>
+                <dd class="text-gray-800">{{ signedRupees(inv.round_off) }}</dd>
+              </div>
+            }
+            <div class="flex justify-between border-t border-gray-200 pt-2.5 text-[18px] font-semibold">
+              <dt class="text-gray-800">Grand total</dt>
+              <dd class="text-brand-600" [class.line-through]="inv.status === 'cancelled'">{{ rupees(inv.grand_total) }}</dd>
+            </div>
+            @if (inv.status === 'issued') {
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Paid</dt>
+                <dd class="font-medium text-green-700">− {{ rupees(inv.amount_paid) }}</dd>
+              </div>
+              <div class="flex justify-between rounded-md px-3 py-2 font-semibold" [class]="inv.balance > 0 ? 'bg-brand-100/50 text-brand-600' : 'bg-green-50 text-green-700'">
+                <dt>Balance due</dt>
+                <dd>{{ rupees(inv.balance) }}</dd>
+              </div>
+            }
+          </dl>
+        </div>
+      </section>
+
+      <!-- Payment history -->
+      <section class="overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-4 lg:px-6">
+          <h2 class="text-[17px] font-semibold text-gray-800">Payment history</h2>
+          <span class="text-[14px] text-gray-500">
+            {{ inv.payments.length }} {{ inv.payments.length === 1 ? 'payment' : 'payments' }} · {{ rupees(inv.amount_paid) }} received
+          </span>
+        </div>
+        @if (inv.payments.length) {
+          <div class="overflow-x-auto border-t border-gray-200">
+            <table class="w-full min-w-[560px] text-left text-[15px]">
+              <thead>
+                <tr class="border-b border-gray-200 text-[12px] font-medium tracking-wide text-gray-600 uppercase">
+                  <th class="py-3 pl-5 font-medium lg:pl-6">Date</th>
+                  <th class="px-3 py-3 font-medium">Method</th>
+                  <th class="px-3 py-3 font-medium">Reference</th>
+                  <th class="px-3 py-3 text-right font-medium">Amount</th>
+                  <th class="px-3 py-3 text-right font-medium">Balance after</th>
+                  <th class="w-12 py-3 pr-5 lg:pr-6"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of inv.payments; track p.id; let i = $index) {
+                  <tr class="border-b border-gray-100" [class.opacity-50]="removingPaymentId() === p.id">
+                    <td class="py-3 pl-5 whitespace-nowrap text-gray-800 lg:pl-6">{{ formatIsoDate(p.paid_on) }}</td>
+                    <td class="px-3 py-3 text-gray-700">{{ p.method_label }}</td>
+                    <td class="px-3 py-3 font-mono text-[13px] text-gray-600">{{ p.reference || '—' }}</td>
+                    <td class="px-3 py-3 text-right font-medium whitespace-nowrap text-green-700">{{ rupees(p.amount) }}</td>
+                    <td class="px-3 py-3 text-right whitespace-nowrap text-gray-600">{{ rupees(balanceAfter(i)) }}</td>
+                    <td class="py-3 pr-5 text-right lg:pr-6">
+                      @if (isIssued()) {
+                        <button
+                          type="button"
+                          (click)="removePayment(p)"
+                          [disabled]="removingPaymentId() === p.id"
+                          class="rounded-full p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-500"
+                          [attr.aria-label]="'Remove payment of ' + rupees(p.amount)"
+                          title="Remove payment"
+                        >
+                          <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="border-t border-gray-200 px-5 py-6 text-center text-[14px] text-gray-500 lg:px-6">No payments recorded yet.</p>
+        }
+      </section>
+    </div>
+
+    <!-- Payments -->
+    <aside class="space-y-5">
+      <section class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+        <h2 class="text-[17px] font-semibold text-gray-800">Payments</h2>
+        <dl class="mt-4 grid grid-cols-2 gap-3 text-center">
+          <div class="rounded-md bg-green-50 px-3 py-3">
+            <dt class="text-[12px] text-green-700">Received</dt>
+            <dd class="text-[17px] font-semibold text-green-700">{{ rupees(inv.amount_paid) }}</dd>
+          </div>
+          <div class="rounded-md px-3 py-3" [class]="inv.balance > 0 && inv.status === 'issued' ? 'bg-brand-100/50' : 'bg-gray-50'">
+            <dt class="text-[12px] text-gray-600">Balance due</dt>
+            <dd class="text-[17px] font-semibold" [class]="inv.balance > 0 && inv.status === 'issued' ? 'text-brand-600' : 'text-gray-500'">
+              {{ inv.status === 'cancelled' ? '—' : rupees(inv.balance) }}
+            </dd>
+          </div>
+        </dl>
+
+        <p class="mt-3 text-[13px] text-gray-500">
+          @if (inv.payments.length) {
+            {{ inv.payments.length }} {{ inv.payments.length === 1 ? 'payment' : 'payments' }} — see Payment history.
+          } @else {
+            No payments recorded yet.
+          }
+        </p>
+      </section>
+
+      <section class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+        <h2 class="text-[17px] font-semibold text-gray-800">Record payment</h2>
+        @if (inv.status === 'cancelled') {
+          <p class="mt-3 rounded-md bg-gray-50 px-4 py-3 text-[14px] text-gray-600">This invoice is cancelled, so payments can't be recorded.</p>
+        } @else if (!canTakePayment()) {
+          <div class="mt-3 flex items-start gap-3 rounded-md bg-green-50 px-4 py-3 text-[14px] text-green-800">
+            <svg class="mt-0.5 h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+            <p>
+              <span class="font-medium">Fully paid</span> — nothing is due on this invoice.
+              To correct a payment, remove it above and record it again.
+            </p>
+          </div>
+        } @else {
+          <form [formGroup]="payment" (ngSubmit)="recordPayment()" novalidate class="mt-4 space-y-4">
+            @if (paymentError()) {
+              <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700" role="alert">{{ paymentError() }}</div>
+            }
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="pay-date" class="mb-1.5 block text-[14px] text-gray-700">Date</label>
+                <input
+                  id="pay-date"
+                  type="date"
+                  formControlName="paid_on"
+                  [max]="today"
+                  class="h-[42px] px-3"
+                  [class]="FIELD_BASE + ' ' + fieldState(!!paymentFieldError('paid_on'))"
+                />
+                @if (paymentFieldError('paid_on'); as msg) {
+                  <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                }
+              </div>
+              <div>
+                <label for="pay-amount" class="mb-1.5 block text-[14px] text-gray-700">Amount (₹)</label>
+                <input
+                  id="pay-amount"
+                  type="number"
+                  formControlName="amount"
+                  min="0.01"
+                  step="any"
+                  class="h-[42px] px-3"
+                  [class]="FIELD_BASE + ' ' + fieldState(!!paymentFieldError('amount'))"
+                />
+                @if (paymentFieldError('amount'); as msg) {
+                  <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                }
+              </div>
+            </div>
+            <div>
+              <label for="pay-method" class="mb-1.5 block text-[14px] text-gray-700">Method</label>
+              <select id="pay-method" formControlName="method" class="h-[42px] px-3 border-gray-300 focus:border-brand-600 focus:ring-brand-600/15" [class]="FIELD_BASE">
+                @for (m of methods; track m.value) {
+                  <option [value]="m.value">{{ m.label }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label for="pay-ref" class="mb-1.5 block text-[14px] text-gray-700">Reference <span class="text-[12px] text-gray-400">(UTR / cheque no, optional)</span></label>
+              <input
+                id="pay-ref"
+                type="text"
+                formControlName="reference"
+                [maxlength]="limits.maxReference"
+                class="h-[42px] px-3"
+                [class]="FIELD_BASE + ' ' + fieldState(!!paymentFieldError('reference'))"
+              />
+              @if (paymentFieldError('reference'); as msg) {
+                <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+              }
+            </div>
+            <button
+              type="submit"
+              [disabled]="paymentSaving()"
+              class="flex h-[42px] w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 text-[15px] font-medium text-white transition hover:brightness-105 disabled:opacity-70"
+            >
+              {{ paymentSaving() ? 'Saving…' : 'Record Payment' }}
+            </button>
+          </form>
+        }
+      </section>
+
+      <section class="rounded-md bg-white p-5 text-[13px] text-gray-500 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+        <p>Created {{ inv.created_at | date: 'd MMM y, h:mm a' }}</p>
+        <p>Last updated {{ inv.updated_at | date: 'd MMM y, h:mm a' }}</p>
+        @if (inv.cancelled_at) {
+          <p class="text-red-600">Cancelled {{ inv.cancelled_at | date: 'd MMM y, h:mm a' }}</p>
+        }
+      </section>
+    </aside>
+  </div>
+}

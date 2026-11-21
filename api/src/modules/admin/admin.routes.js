@@ -11,6 +11,9 @@ const userRoutes = require('./user/user.routes');
 const couponRoutes = require('./coupon/coupon.routes');
 const orderRoutes = require('./order/order.routes');
 const clientLogoRoutes = require('./client-logo/client-logo.routes');
+const vendorRoutes = require('./vendor/vendor.routes');
+const vendorInvoiceRoutes = require('./vendor-invoice/vendor-invoice.routes');
+const settingRoutes = require('./setting/setting.routes');
 
 const router = express.Router();
 
@@ -29,5 +32,8 @@ router.use('/users', userRoutes);
 router.use('/coupons', couponRoutes);
 router.use('/orders', orderRoutes);
 router.use('/client-logos', clientLogoRoutes);
+router.use('/vendors', vendorRoutes);
+router.use('/vendor-invoices', vendorInvoiceRoutes);
+router.use('/settings', settingRoutes);
 
 module.exports = router;

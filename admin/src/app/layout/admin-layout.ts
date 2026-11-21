@@ -3,7 +3,20 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../core/services/auth.service';
 
-type NavIcon = 'products' | 'categories' | 'attributes' | 'faqs' | 'clients' | 'bookings' | 'technicians' | 'users' | 'coupons' | 'orders';
+type NavIcon =
+  | 'products'
+  | 'categories'
+  | 'attributes'
+  | 'faqs'
+  | 'clients'
+  | 'bookings'
+  | 'technicians'
+  | 'users'
+  | 'coupons'
+  | 'orders'
+  | 'vendors'
+  | 'invoices'
+  | 'settings';
 
 interface NavSection {
   heading: string;
@@ -39,6 +52,13 @@ export class AdminLayout implements OnInit {
       ],
     },
     {
+      heading: 'Vendors',
+      items: [
+        { label: 'Vendors', path: '/vendors', icon: 'vendors' },
+        { label: 'Vendor Invoices', path: '/vendor-invoices', icon: 'invoices' },
+      ],
+    },
+    {
       heading: 'Service',
       items: [
         { label: 'Service Bookings', path: '/service-bookings', icon: 'bookings' },
@@ -55,6 +75,10 @@ export class AdminLayout implements OnInit {
         { label: 'FAQs', path: '/faqs', icon: 'faqs' },
         { label: 'Client Logos', path: '/client-logos', icon: 'clients' },
       ],
+    },
+    {
+      heading: 'Settings',
+      items: [{ label: 'Invoice Settings', path: '/settings/invoice', icon: 'settings' }],
     },
   ];
 

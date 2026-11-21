@@ -1,0 +1,98 @@
+<div class="mb-5">
+  <h1 class="text-[22px] font-semibold text-gray-800">Invoice Settings</h1>
+  <p class="text-[14px] text-gray-500">Default content for vendor invoices.</p>
+</div>
+
+@if (loading()) {
+  <div class="h-96 animate-pulse rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]"></div>
+} @else if (loadError()) {
+  <div class="rounded-md bg-white px-6 py-14 text-center shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    <p class="text-red-600">{{ loadError() }}</p>
+  </div>
+} @else if (settings(); as s) {
+  <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-5">
+    <!-- Editor -->
+    <section class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:col-span-3 lg:p-6">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="text-[17px] font-semibold text-gray-800">Default terms &amp; conditions</h2>
+          <p class="mt-0.5 text-[14px] text-gray-500">
+            Every new vendor invoice starts with these. They also print on invoices saved without terms.
+          </p>
+        </div>
+        @if (s.vendor_terms_is_default) {
+          <span class="rounded bg-gray-100 px-2.5 py-1 text-[13px] font-medium text-gray-600">Built-in default</span>
+        } @else {
+          <span class="rounded bg-brand-100/60 px-2.5 py-1 text-[13px] font-medium text-brand-600">Customised</span>
+        }
+      </div>
+
+      @if (error()) {
+        <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+      }
+
+      <div class="mt-5">
+        <div class="mb-2 flex items-end justify-between">
+          <label for="default-terms" class="block text-[15px] text-gray-700">Terms <span class="text-[13px] text-gray-400">(one point per line — numbers are added automatically)</span></label>
+          <span class="text-[12px]" [class]="termsValue().length > maxTerms ? 'text-red-600' : 'text-gray-400'">{{ termsValue().length }} / {{ maxTerms }}</span>
+        </div>
+        <textarea
+          id="default-terms"
+          [formControl]="terms"
+          rows="18"
+          class="px-4 py-3 leading-relaxed"
+          [class]="FIELD_BASE + ' ' + fieldState(!!termsError())"
+        ></textarea>
+        @if (termsError(); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        }
+      </div>
+
+      <div class="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          (click)="save()"
+          [disabled]="saving() || !dirty()"
+          class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {{ saving() ? 'Saving…' : 'Save Terms' }}
+        </button>
+        @if (dirty()) {
+          <button type="button" (click)="discard()" [disabled]="saving()" class="h-[42px] rounded-md bg-gray-100 px-5 text-[15px] font-medium text-gray-600 transition hover:bg-gray-200">
+            Discard changes
+          </button>
+        }
+        @if (!s.vendor_terms_is_default) {
+          <button type="button" (click)="restoreDefault()" [disabled]="saving()" class="ml-auto text-[14px] font-medium text-brand-500 hover:underline">
+            Restore default terms
+          </button>
+        }
+      </div>
+
+      @if (s.updated_at) {
+        <p class="mt-4 text-[13px] text-gray-400">
+          Last saved {{ s.updated_at | date: 'd MMM y, h:mm a' }}{{ s.updated_by_name ? ' by ' + s.updated_by_name : '' }}
+        </p>
+      }
+      <p class="mt-2 text-[13px] text-gray-400">Changing these doesn't change invoices already saved — open one and use “Use default terms” to update it.</p>
+    </section>
+
+    <!-- Preview -->
+    <section class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:col-span-2 lg:p-6">
+      <p class="text-[12px] font-medium tracking-wider text-gray-400 uppercase">Preview · page 2 of the PDF</p>
+      <h3 class="mt-2 text-[17px] font-semibold text-[#0d4a3f]">Terms &amp; Conditions</h3>
+      @if (points().length) {
+        <ol class="mt-3 space-y-2 text-[14px] leading-relaxed text-gray-700">
+          @for (point of points(); track $index) {
+            <li class="flex gap-2">
+              <span class="shrink-0 text-gray-400">{{ $index + 1 }}.</span>
+              <span>{{ point }}</span>
+            </li>
+          }
+        </ol>
+      } @else {
+        <p class="mt-3 text-[14px] text-gray-400">No points yet.</p>
+      }
+    </section>
+  </div>
+}

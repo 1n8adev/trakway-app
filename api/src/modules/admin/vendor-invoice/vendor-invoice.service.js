@@ -1,0 +1,265 @@
+// Business logic for vendor invoices: GST maths, numbering, payments. Throws ApiError on rule violations.
+const env = require('../../../config/env');
+const ApiError = require('../../../utils/ApiError');
+const { round2 } = require('../../../utils/money');
+const vendorInvoiceRepository = require('./vendor-invoice.repository');
+const { renderVendorInvoicePdf } = require('./vendor-invoice.pdf');
+const settingService = require('../setting/setting.service');
+const { GST_RATES, PAYMENT_METHODS } = require('./vendor-invoice.validation');
+
+const PAYMENT_METHOD_LABELS = {
+  bank_transfer: 'Bank transfer',
+  upi: 'UPI',
+  cash: 'Cash',
+  cheque: 'Cheque',
+  other: 'Other',
+};
+
+// Indian financial year (April–March) of a "YYYY-MM-DD" date: "2026-10-30" -> "2026-27".
+function financialYear(date) {
+  const [year, month] = date.split('-').map(Number);
+  const start = month >= 4 ? year : year - 1;
+  return `${start}-${String((start + 1) % 100).padStart(2, '0')}`;
+}
+
+// "TWV/2026-27/0001"
+const invoiceNumber = (fy, seq) => `${env.invoice.vendorPrefix}/${fy}/${String(seq).padStart(4, '0')}`;
+
+const sameState = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+
+// Prices are exclusive of GST. Each line: taxable = qty x rate, tax = taxable x GST %.
+// Same state as the seller: the tax is split CGST + SGST (half each, per line), otherwise IGST.
+function calculate(items, intraState) {
+  const lines = items.map((item, index) => {
+    const quantity = Number(item.quantity);
+    const unitPrice = Number(item.unit_price);
+    const taxable = round2(quantity * unitPrice);
+    const tax = round2((taxable * item.gst_rate) / 100);
+    return {
+      ...item,
+      quantity,
+      unit_price: unitPrice,
+      taxable_value: taxable,
+      tax_amount: tax,
+      line_total: round2(taxable + tax),
+      sort_order: index,
+    };
+  });
+  const subtotal = round2(lines.reduce((sum, l) => sum + l.taxable_value, 0));
+  const totalTax = round2(lines.reduce((sum, l) => sum + l.tax_amount, 0));
+  const cgst = intraState ? round2(lines.reduce((sum, l) => sum + round2(l.tax_amount / 2), 0)) : 0;
+  // Grand total rounded to the nearest rupee; round_off is the +/- adjustment shown on the invoice.
+  const exactTotal = round2(subtotal + totalTax);
+  const grandTotal = Math.round(exactTotal);
+  return {
+    lines,
+    totals: {
+      subtotal,
+      cgst,
+      sgst: intraState ? round2(totalTax - cgst) : 0,
+      igst: intraState ? 0 : totalTax,
+      total_tax: totalTax,
+      round_off: round2(grandTotal - exactTotal),
+      grand_total: grandTotal,
+    },
+  };
+}
+
+// Tax per GST rate for the invoice's summary: [{ rate, taxable, cgst, sgst, igst, tax }].
+function taxByRate(items, intraState) {
+  const groups = new Map();
+  for (const item of items) {
+    const g = groups.get(item.gst_rate) || { rate: item.gst_rate, taxable: 0, tax: 0 };
+    g.taxable = round2(g.taxable + item.taxable_value);
+    g.tax = round2(g.tax + item.tax_amount);
+    groups.set(item.gst_rate, g);
+  }
+  return [...groups.values()]
+    .sort((a, b) => a.rate - b.rate)
+    .map((g) => {
+      const cgst = intraState ? round2(g.tax / 2) : 0;
+      return { ...g, cgst, sgst: intraState ? round2(g.tax - cgst) : 0, igst: intraState ? 0 : g.tax };
+    });
+}
+
+const methodLabel = (method) => PAYMENT_METHOD_LABELS[method] || method;
+
+async function findOrFail(id) {
+  const invoice = await vendorInvoiceRepository.findById(id);
+  if (!invoice) throw ApiError.notFound('Invoice not found');
+  return invoice;
+}
+
+// Invoice with items, payments and the GST summary.
+async function getById(id) {
+  const invoice = await findOrFail(id);
+  const [items, payments] = await Promise.all([
+    vendorInvoiceRepository.findItems(id),
+    vendorInvoiceRepository.findPayments(id),
+  ]);
+  return {
+    ...invoice,
+    items,
+    payments: payments.map((p) => ({ ...p, method_label: methodLabel(p.method) })),
+    tax_summary: taxByRate(items, invoice.intra_state),
+  };
+}
+
+async function list(filters, pagination) {
+  return vendorInvoiceRepository.findAll(filters, pagination);
+}
+
+async function summary(filters) {
+  return vendorInvoiceRepository.summary(filters);
+}
+
+// Everything the invoice form needs in one call.
+async function options() {
+  const [{ vendors, products }, defaultTerms] = await Promise.all([
+    vendorInvoiceRepository.options(),
+    settingService.vendorTerms(),
+  ]);
+  return {
+    vendors,
+    // price = website selling price, GST-inclusive; the form converts it to a rate before GST.
+    products,
+    seller_state: env.invoice.sellerState,
+    gst_rates: GST_RATES,
+    default_gst_rate: env.invoice.gstRate,
+    default_hsn: env.invoice.hsn,
+    // Admin > Settings > Invoice Settings, else the built-in default.
+    default_terms: defaultTerms,
+    payment_methods: PAYMENT_METHODS.map((value) => ({ value, label: methodLabel(value) })),
+  };
+}
+
+// Turns a validated request body into invoice columns + calculated lines.
+// bill_* is copied from the vendor now, so later vendor edits don't change this invoice.
+async function build(body, { allowInactiveVendorId = null } = {}) {
+  const vendor = await vendorInvoiceRepository.findVendor(body.vendor_id);
+  if (!vendor) throw ApiError.badRequest('Validation failed', { vendor_id: 'Vendor not found' });
+  // Keeping an already-billed vendor on an edit is fine even if they were deactivated since.
+  if (!vendor.is_active && vendor.id !== allowInactiveVendorId) {
+    throw ApiError.badRequest('Validation failed', { vendor_id: 'This vendor is inactive' });
+  }
+
+  const productIds = [...new Set(body.items.map((i) => i.product_id).filter(Boolean))];
+  const names = await vendorInvoiceRepository.productNames(productIds);
+  const fieldErrors = {};
+  const items = body.items.map((item, i) => {
+    if (item.product_id && !names[item.product_id]) fieldErrors[`items.${i}.product_id`] = 'Product not found';
+    return {
+      product_id: item.product_id,
+      description: item.description || names[item.product_id] || '',
+      hsn_sac: item.hsn_sac,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      gst_rate: item.gst_rate,
+    };
+  });
+  if (Object.keys(fieldErrors).length) throw ApiError.badRequest('Validation failed', fieldErrors);
+
+  const intraState = sameState(vendor.state, env.invoice.sellerState);
+  const { lines, totals } = calculate(items, intraState);
+  return {
+    invoice: {
+      vendor_id: vendor.id,
+      invoice_date: body.invoice_date,
+      due_date: body.due_date ?? null,
+      bill_name: vendor.name,
+      bill_contact_person: vendor.contact_person,
+      bill_mobile: vendor.mobile,
+      bill_email: vendor.email,
+      bill_gstin: vendor.gstin,
+      bill_address: vendor.address,
+      bill_city: vendor.city,
+      bill_state: vendor.state,
+      bill_pincode: vendor.pincode,
+      intra_state: intraState,
+      ...totals,
+      notes: body.notes ?? null,
+      terms: body.terms ?? null,
+    },
+    lines,
+  };
+}
+
+async function create(body, adminId) {
+  const { invoice, lines } = await build(body);
+  const id = await vendorInvoiceRepository.create(invoice, lines, {
+    financialYear: financialYear(invoice.invoice_date),
+    numberFor: invoiceNumber,
+    createdBy: adminId ?? null,
+  });
+  return getById(id);
+}
+
+// The invoice number never changes. Cancelled invoices are read-only, and the new total
+// can't drop below what the vendor has already paid.
+async function update(id, body) {
+  const existing = await findOrFail(id);
+  const { invoice, lines } = await build(body, { allowInactiveVendorId: existing.vendor_id });
+  await vendorInvoiceRepository.update(id, invoice, lines, (locked) => {
+    if (locked.status === 'cancelled') throw ApiError.conflict('Cancelled invoices cannot be edited');
+    if (invoice.grand_total < locked.amount_paid) {
+      throw ApiError.conflict(
+        `The new total (${invoice.grand_total}) is less than the ${locked.amount_paid} already received. Remove a payment first.`,
+      );
+    }
+  });
+  return getById(id);
+}
+
+// The number stays used (GST numbering has no gaps); the invoice is kept and marked cancelled.
+async function cancel(id) {
+  const invoice = await findOrFail(id);
+  if (invoice.status === 'cancelled') throw ApiError.conflict('Invoice is already cancelled');
+  if (invoice.amount_paid > 0) throw ApiError.conflict('This invoice has payments. Remove them before cancelling.');
+  await vendorInvoiceRepository.cancel(id);
+  return getById(id);
+}
+
+async function addPayment(id, payment) {
+  await findOrFail(id);
+  const amount = Number(payment.amount);
+  await vendorInvoiceRepository.addPayment(id, { ...payment, amount }, (locked) => {
+    if (locked.status === 'cancelled') throw ApiError.conflict('Payments cannot be added to a cancelled invoice');
+    const balance = round2(locked.grand_total - locked.amount_paid);
+    if (amount > balance) {
+      throw ApiError.badRequest('Validation failed', { amount: `Amount cannot be more than the balance (${balance})` });
+    }
+  });
+  return getById(id);
+}
+
+async function removePayment(id, paymentId) {
+  await findOrFail(id);
+  const found = await vendorInvoiceRepository.removePayment(id, paymentId, (locked) => {
+    if (locked.status === 'cancelled') throw ApiError.conflict('Cancelled invoices cannot be changed');
+  });
+  if (!found) throw ApiError.notFound('Payment not found');
+  return getById(id);
+}
+
+// Returns { filename, pdf (Buffer) }. An invoice saved without terms prints the default terms.
+async function getPdf(id) {
+  const invoice = await getById(id);
+  const terms = invoice.terms || (await settingService.vendorTerms()) || null;
+  const pdf = await renderVendorInvoicePdf({ seller: env.invoice, invoice: { ...invoice, terms } });
+  return { filename: `Invoice-${invoice.invoice_no.replace(/\//g, '-')}.pdf`, pdf };
+}
+
+module.exports = {
+  list,
+  summary,
+  options,
+  getById,
+  create,
+  update,
+  cancel,
+  addPayment,
+  removePayment,
+  getPdf,
+  calculate,
+  financialYear,
+};

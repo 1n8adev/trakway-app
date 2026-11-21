@@ -81,3 +81,8 @@ export function rupees(amount: number | null | undefined): string {
   if (amount === null || amount === undefined) return '—';
   return '₹' + amount.toLocaleString('en-IN', { minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: 2 });
 }
+
+// Adjustment with an explicit sign, e.g. 0.18 -> "+ ₹0.18", -0.4 -> "− ₹0.40".
+export function signedRupees(amount: number): string {
+  return (amount < 0 ? '− ' : '+ ') + rupees(Math.abs(amount));
+}
