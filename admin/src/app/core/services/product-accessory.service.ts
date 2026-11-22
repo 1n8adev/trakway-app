@@ -1,15 +1,19 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../models/api.model';
-import { ProductAccessory, ProductAccessoryFilters, ProductAccessoryPayload } from '../models/product-accessory.model';
+import { MappableSupplierProduct, ProductAccessory, ProductAccessoryFilters, ProductAccessoryPayload } from '../models/product-accessory.model';
 
 // /api/admin/product-accessories
 @Injectable({ providedIn: 'root' })
 export class ProductAccessoryService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/admin/product-accessories`;
+
+  supplierProducts(): Observable<MappableSupplierProduct[]> {
+    return this.http.get<ApiResponse<MappableSupplierProduct[]>>(`${this.baseUrl}/supplier-products`).pipe(map((res) => res.data));
+  }
 
   list(filters: ProductAccessoryFilters = {}): Observable<PaginatedResponse<ProductAccessory>> {
     let params = new HttpParams();

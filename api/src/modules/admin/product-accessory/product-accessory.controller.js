@@ -5,7 +5,7 @@ const response = require('../../../utils/response');
 const { getPagination } = require('../../../utils/pagination');
 const accessoryService = require('./product-accessory.service');
 
-const FIELDS = ['name', 'price', 'hsn_code', 'gst_rate', 'is_active'];
+const FIELDS = ['name', 'price', 'hsn_code', 'gst_rate', 'is_active', 'supplier_product_ids'];
 
 function parseId(value) {
   const id = Number(value);
@@ -25,6 +25,11 @@ const list = asyncHandler(async (req, res) => {
   };
   const { items, total } = await accessoryService.list(filters, pagination);
   response.paginated(res, items, { ...pagination, total });
+});
+
+// Every supplier product with its current accessory mapping (for the form's picker).
+const supplierProducts = asyncHandler(async (req, res) => {
+  response.success(res, await accessoryService.mappableSupplierProducts());
 });
 
 const getById = asyncHandler(async (req, res) => {
@@ -50,4 +55,4 @@ const remove = asyncHandler(async (req, res) => {
   response.success(res, null, 'Accessory deleted');
 });
 
-module.exports = { list, getById, create, update, setStatus, remove };
+module.exports = { list, supplierProducts, getById, create, update, setStatus, remove };

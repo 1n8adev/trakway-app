@@ -39,6 +39,7 @@ function normalize(req, res, next) {
   if (Array.isArray(body.items)) {
     body.items = body.items.map((item) => ({
       product_id: item?.product_id === undefined || item?.product_id === null || item?.product_id === '' ? null : Number(item.product_id),
+      variant_id: item?.variant_id === undefined || item?.variant_id === null || item?.variant_id === '' ? null : Number(item.variant_id),
       accessory_id: item?.accessory_id === undefined || item?.accessory_id === null || item?.accessory_id === '' ? null : Number(item.accessory_id),
       description: trimOrNull(item?.description),
       hsn_sac: trimOrNull(item?.hsn_sac),
@@ -58,7 +59,8 @@ function textError(errors, key, value, label) {
 }
 
 // POST / PUT — the whole invoice: { vendor_id, invoice_date, due_date?, notes?, terms?, items: [...] }.
-// Item: { product_id? | accessory_id? (at most one; neither = custom line), description (optional when either is set),
+// Item: { product_id? (+ variant_id when the product has combinations) | accessory_id? (at most one; neither = custom line),
+//         description (optional when either is set),
 //         hsn_sac?, quantity, unit_price, gst_rate }.
 function invoice(body) {
   const errors = {};
@@ -86,6 +88,10 @@ function invoice(body) {
         errors[at('accessory_id')] = 'Invalid accessory';
       }
       if (item.product_id !== null && item.accessory_id !== null) errors[at('accessory_id')] = 'A line is either a product or an accessory';
+      if (item.variant_id !== null) {
+        if (!Number.isInteger(item.variant_id) || item.variant_id <= 0) errors[at('variant_id')] = 'Invalid combination';
+        else if (item.product_id === null) errors[at('variant_id')] = 'Only product lines have a combination';
+      }
       if (item.description === null) {
         if (item.product_id === null && item.accessory_id === null) errors[at('description')] = 'Select a product or accessory, or enter a description';
       } else if (typeof item.description !== 'string' || item.description.length > LIMITS.description) {

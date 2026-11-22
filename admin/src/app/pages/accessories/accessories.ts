@@ -104,7 +104,7 @@ export class Accessories implements OnInit {
     this.dialog
       .open<AccessoryForm, AccessoryFormData, ProductAccessory>(AccessoryForm, {
         data: { accessory },
-        width: '620px',
+        width: '720px',
         autoFocus: '#accessory-name',
       })
       .afterClosed()

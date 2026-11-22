@@ -6,6 +6,9 @@ export interface VendorInvoiceItem {
   id: number;
   // At most one is set; neither = custom line.
   product_id: number | null;
+  // The combination sold on a product line (e.g. "1 Year"), when the product has combinations.
+  variant_id: number | null;
+  variant_label: string | null;
   accessory_id: number | null;
   description: string;
   hsn_sac: string | null;
@@ -127,14 +130,31 @@ export interface VendorInvoiceSummary {
   overdue: number;
 }
 
+export interface VendorInvoiceOptionVariant {
+  id: number;
+  label: string;
+  sku: string | null;
+  price: number;
+}
+
+export interface VendorInvoiceOptionProduct {
+  id: number;
+  name: string;
+  price: number | null;
+  stock: number;
+  variants: VendorInvoiceOptionVariant[];
+}
+
 export interface VendorInvoiceOptions {
   // Active invoice types, in their display order.
   types: { id: number; name: string; prefix: string }[];
   vendors: { id: number; name: string; contact_person: string | null; mobile: string; gstin: string | null; city: string; state: string }[];
   // price: website selling price, GST-inclusive (null when priced per combination).
-  products: { id: number; name: string; price: number | null }[];
+  // variants: active combinations (price GST-inclusive) — a product with any needs one picked on its line.
+  // stock: available units (purchased − invoiced − ordered), shared by all combinations; a warning only.
+  products: VendorInvoiceOptionProduct[];
   // Active accessories; price is the rate before GST.
-  accessories: { id: number; name: string; price: number; hsn_code: string; gst_rate: number }[];
+  accessories: { id: number; name: string; price: number; hsn_code: string; gst_rate: number; stock: number }[];
   seller_state: string;
   gst_rates: number[];
   default_gst_rate: number;
@@ -146,6 +166,7 @@ export interface VendorInvoiceOptions {
 // POST / PUT send the whole invoice; the API calculates every amount.
 export interface VendorInvoiceItemPayload {
   product_id: number | null;
+  variant_id: number | null;
   accessory_id: number | null;
   description: string | null;
   hsn_sac: string | null;

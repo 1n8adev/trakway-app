@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../models/api.model';
+import { ProductSuppliers } from '../models/product-accessory.model';
 import {
   BenefitPayload,
   ProductBasicPayload,
@@ -79,6 +80,15 @@ export class ProductService {
   // Tab 6. Unlike the other tabs this returns { attributes, variants }, not the product.
   updateVariants(id: number, variants: VariantPayload[]): Observable<ApiResponse<ProductVariantsResponse>> {
     return this.http.put<ApiResponse<ProductVariantsResponse>>(`${this.baseUrl}/${id}/variants`, { variants });
+  }
+
+  // Suppliers tab: which supplier products are this product. Returns { supplier_products }.
+  getSuppliers(id: number): Observable<ProductSuppliers> {
+    return this.http.get<ApiResponse<ProductSuppliers>>(`${this.baseUrl}/${id}/suppliers`).pipe(map((res) => res.data));
+  }
+
+  updateSuppliers(id: number, supplierProductIds: number[]): Observable<ApiResponse<ProductSuppliers>> {
+    return this.http.put<ApiResponse<ProductSuppliers>>(`${this.baseUrl}/${id}/suppliers`, { supplier_product_ids: supplierProductIds });
   }
 
   setStatus(id: number, isActive: boolean): Observable<ApiResponse<ProductDetails>> {

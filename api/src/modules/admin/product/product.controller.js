@@ -5,6 +5,7 @@ const response = require('../../../utils/response');
 const { getPagination } = require('../../../utils/pagination');
 const productService = require('./product.service');
 const variantService = require('./product-variant.service');
+const productSupplierService = require('./product-supplier.service');
 const { FIELDS } = require('./product.validation');
 
 function parseId(value, label = 'product') {
@@ -72,6 +73,16 @@ const updateVariants = asyncHandler(async (req, res) => {
   response.success(res, result, 'Combinations updated');
 });
 
+// Tab: Suppliers — { supplier_products } (all, with their current mapping).
+const getSuppliers = asyncHandler(async (req, res) => {
+  response.success(res, await productSupplierService.get(parseId(req.params.id)));
+});
+
+const updateSuppliers = asyncHandler(async (req, res) => {
+  const result = await productSupplierService.replace(parseId(req.params.id), req.body.supplier_product_ids);
+  response.success(res, result, 'Supplier mapping updated');
+});
+
 const setStatus = asyncHandler(async (req, res) => {
   const product = await productService.setStatus(parseId(req.params.id), req.body.is_active);
   response.success(res, product, `Product ${product.is_active ? 'activated' : 'deactivated'}`);
@@ -94,6 +105,8 @@ module.exports = {
   updateSeo,
   getVariants,
   updateVariants,
+  getSuppliers,
+  updateSuppliers,
   setStatus,
   remove,
 };

@@ -39,8 +39,10 @@ export class VendorInvoiceService {
   }
 
   // Active vendors + products, GST rates and defaults for the invoice form.
-  options(): Observable<VendorInvoiceOptions> {
-    return this.http.get<ApiResponse<VendorInvoiceOptions>>(`${this.baseUrl}/options`).pipe(map((res) => res.data));
+  // invoiceId (when editing) leaves that invoice's own lines out of the stock figures.
+  options(invoiceId: number | null = null): Observable<VendorInvoiceOptions> {
+    const params = invoiceId ? { invoice_id: String(invoiceId) } : undefined;
+    return this.http.get<ApiResponse<VendorInvoiceOptions>>(`${this.baseUrl}/options`, { params }).pipe(map((res) => res.data));
   }
 
   getById(id: number): Observable<VendorInvoice> {

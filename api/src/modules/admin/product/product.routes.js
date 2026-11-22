@@ -35,6 +35,10 @@ router.put('/:id/seo', ...withText, validate(productValidation.seo), productCont
 router.get('/:id/variants', productController.getVariants);
 router.put('/:id/variants', ...withText, validate(productValidation.variants), productController.updateVariants);
 
+// Suppliers tab: which supplier products are this product (JSON).
+router.get('/:id/suppliers', productController.getSuppliers);
+router.put('/:id/suppliers', validate(productValidation.suppliers), productController.updateSuppliers);
+
 router.patch('/:id/status', ...withText, validate(productValidation.status), productController.setStatus);
 router.delete('/:id', productController.remove);
 

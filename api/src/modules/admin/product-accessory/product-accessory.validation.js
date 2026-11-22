@@ -2,6 +2,7 @@
 const { GST_RATES } = require('../vendor-invoice/vendor-invoice.validation');
 
 const MAX_NAME = 150;
+const MAX_SUPPLIER_PRODUCTS = 100;
 const MAX_PRICE = 9999999999.99;
 const HSN_REGEX = /^\d{4,8}$/;
 const TWO_DECIMALS = /^\d+(\.\d{1,2})?$/;
@@ -12,6 +13,7 @@ function normalize(req, res, next) {
   if (typeof body.name === 'string') body.name = body.name.trim().replace(/\s+/g, ' ');
   if (typeof body.hsn_code === 'string') body.hsn_code = body.hsn_code.trim();
   if (body.gst_rate !== undefined && body.gst_rate !== null && body.gst_rate !== '') body.gst_rate = Number(body.gst_rate);
+  if (Array.isArray(body.supplier_product_ids)) body.supplier_product_ids = body.supplier_product_ids.map(Number);
   req.body = body;
   next();
 }
@@ -33,10 +35,16 @@ function fields(body, { partial }) {
   }
   if (need('gst_rate') && !GST_RATES.includes(body.gst_rate)) errors.gst_rate = `GST must be one of ${GST_RATES.join(', ')}%`;
   if (body.is_active !== undefined && typeof body.is_active !== 'boolean') errors.is_active = 'is_active must be true or false';
+  if (body.supplier_product_ids !== undefined) {
+    const ids = body.supplier_product_ids;
+    if (!Array.isArray(ids) || ids.some((id) => !Number.isInteger(id) || id <= 0)) errors.supplier_product_ids = 'supplier_product_ids must be a list of ids';
+    else if (ids.length > MAX_SUPPLIER_PRODUCTS) errors.supplier_product_ids = `At most ${MAX_SUPPLIER_PRODUCTS} supplier products`;
+    else if (new Set(ids).size !== ids.length) errors.supplier_product_ids = 'A supplier product is listed twice';
+  }
   return errors;
 }
 
-// POST — { name, price, hsn_code, gst_rate, is_active? }
+// POST — { name, price, hsn_code, gst_rate, is_active?, supplier_product_ids? (the full mapped set) }
 const create = (body) => fields(body, { partial: false });
 // PUT /:id — any of those fields
 const update = (body) => fields(body, { partial: true });

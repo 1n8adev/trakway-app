@@ -76,7 +76,44 @@ function imagesUpload(folder, options) {
   return runUpload(handler, folder, options);
 }
 
+const DOCUMENT_TYPES = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+
+// Accepts multipart/form-data with one optional document (PDF / JPG / PNG / WEBP) in `field`, stored
+// privately in storage/private/<folder>/ (never served publicly). Sets req.file.privatePath ("<folder>/x.pdf")
+// and keeps req.file.originalname. JSON requests pass through untouched.
+function documentUpload(folder, field, { maxMb = 10 } = {}) {
+  const dir = path.join(PRIVATE_ROOT, folder);
+  fs.mkdirSync(dir, { recursive: true });
+  const handler = multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => cb(null, dir),
+      filename: (req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${DOCUMENT_TYPES[file.mimetype]}`),
+    }),
+    limits: { fileSize: maxMb * MB, files: 1 },
+    fileFilter: (req, file, cb) => {
+      if (file.fieldname !== field) {
+        return cb(ApiError.badRequest(`Unexpected file field "${file.fieldname}"`, { [file.fieldname]: 'Unexpected file' }));
+      }
+      if (!DOCUMENT_TYPES[file.mimetype]) {
+        return cb(ApiError.badRequest('File must be a PDF, JPG, PNG or WEBP', { [field]: 'File must be a PDF, JPG, PNG or WEBP' }));
+      }
+      return cb(null, true);
+    },
+  }).single(field);
+  return (req, res, next) => {
+    handler(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        const message = err.code === 'LIMIT_FILE_SIZE' ? `File must be ${maxMb} MB or smaller` : err.message;
+        return next(ApiError.badRequest(message, { [err.field || field]: message }));
+      }
+      if (err) return next(err);
+      if (req.file) req.file.privatePath = `${folder}/${req.file.filename}`;
+      return next();
+    });
+  };
+}
+
 // Parses multipart/form-data that has text fields only (no files allowed).
 const formFields = () => multer().none();
 
-module.exports = { imageUpload, imagesUpload, formFields };
+module.exports = { imageUpload, imagesUpload, documentUpload, formFields };

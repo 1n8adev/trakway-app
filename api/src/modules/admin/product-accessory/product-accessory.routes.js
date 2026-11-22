@@ -8,6 +8,7 @@ const router = express.Router();
 const { normalize } = accessoryValidation;
 
 router.get('/', accessoryController.list);
+router.get('/supplier-products', accessoryController.supplierProducts);
 router.get('/:id', accessoryController.getById);
 router.post('/', normalize, validate(accessoryValidation.create), accessoryController.create);
 router.put('/:id', normalize, validate(accessoryValidation.update), accessoryController.update);

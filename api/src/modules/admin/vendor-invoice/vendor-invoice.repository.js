@@ -78,8 +78,15 @@ async function findById(id) {
 
 async function findItems(invoiceId) {
   const { rows } = await db.query(
-    `SELECT id, product_id, accessory_id, description, hsn_sac, quantity, unit_price, gst_rate, taxable_value, tax_amount, line_total
-     FROM vendor_invoice_items WHERE invoice_id = $1 ORDER BY sort_order, id`,
+    `SELECT it.id, it.product_id, it.variant_id, it.accessory_id, it.description, it.hsn_sac, it.quantity, it.unit_price, it.gst_rate,
+       it.taxable_value, it.tax_amount, it.line_total, (
+         SELECT STRING_AGG(av.value, ' + ' ORDER BY atr.sort_order, atr.id)
+         FROM product_variant_values pvv
+         JOIN attributes atr ON atr.id = pvv.attribute_id
+         JOIN attribute_values av ON av.id = pvv.attribute_value_id
+         WHERE pvv.variant_id = it.variant_id
+       ) AS variant_label
+     FROM vendor_invoice_items it WHERE it.invoice_id = $1 ORDER BY it.sort_order, it.id`,
     [invoiceId],
   );
   return rows;
@@ -109,6 +116,24 @@ async function options() {
     db.query('SELECT id, name, price, hsn_code, gst_rate FROM product_accessories WHERE is_active = TRUE ORDER BY name'),
   ]);
   return { types: types.rows, vendors: vendors.rows, products: products.rows, accessories: accessories.rows };
+}
+
+// Combinations of the given products (any status) with label and final price, in sort order.
+async function variantsOf(productIds) {
+  if (!productIds.length) return [];
+  const { rows } = await db.query(
+    `SELECT pv.id, pv.product_id, pv.sku, pv.is_active, ${finalPriceSql('pv')} AS price,
+       STRING_AGG(av.value, ' + ' ORDER BY a.sort_order, a.id) AS label
+     FROM product_variants pv
+     JOIN product_variant_values pvv ON pvv.variant_id = pv.id
+     JOIN attributes a ON a.id = pvv.attribute_id
+     JOIN attribute_values av ON av.id = pvv.attribute_value_id
+     WHERE pv.product_id = ANY($1::BIGINT[])
+     GROUP BY pv.id
+     ORDER BY pv.sort_order, pv.id`,
+    [productIds],
+  );
+  return rows;
 }
 
 async function findType(id) {
@@ -142,7 +167,7 @@ async function accessoryNames(ids) {
 const INVOICE_WRITABLE = ['vendor_id', 'invoice_date', 'due_date', 'bill_name', 'bill_contact_person', 'bill_mobile',
   'bill_email', 'bill_gstin', 'bill_address', 'bill_city', 'bill_state', 'bill_pincode', 'intra_state',
   'subtotal', 'cgst', 'sgst', 'igst', 'total_tax', 'round_off', 'grand_total', 'notes', 'terms'];
-const ITEM_WRITABLE = ['product_id', 'accessory_id', 'description', 'hsn_sac', 'quantity', 'unit_price', 'gst_rate',
+const ITEM_WRITABLE = ['product_id', 'variant_id', 'accessory_id', 'description', 'hsn_sac', 'quantity', 'unit_price', 'gst_rate',
   'taxable_value', 'tax_amount', 'line_total', 'sort_order'];
 
 async function insertItems(client, invoiceId, items) {
@@ -246,6 +271,7 @@ module.exports = {
   findType,
   productNames,
   accessoryNames,
+  variantsOf,
   create,
   update,
   cancel,

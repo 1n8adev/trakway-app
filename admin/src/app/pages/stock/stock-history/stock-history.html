@@ -1,0 +1,90 @@
+<div class="flex max-h-[90vh] flex-col font-sans">
+  <!-- Header -->
+  <div class="flex items-start gap-4 border-b border-gray-200 px-6 py-4">
+    @if (item().image) {
+      <img [src]="assetUrl(item().image)" alt="" class="h-12 w-12 shrink-0 rounded-md border border-gray-100 bg-gray-50 object-contain" />
+    }
+    <div class="min-w-0 flex-1">
+      <h2 class="truncate text-[18px] font-semibold text-gray-800">{{ item().name }}</h2>
+      <p class="text-[13px] text-gray-500">{{ item().type === 'accessory' ? 'Accessory' : 'Product' }} · stock history</p>
+    </div>
+    <button type="button" (click)="close()" class="rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    </button>
+  </div>
+
+  <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+    <!-- Totals -->
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="rounded-md bg-gray-50 p-3">
+        <p class="text-[12px] text-gray-500">In stock</p>
+        <p class="text-[22px] font-semibold" [class]="item().stock < 0 ? 'text-red-600' : item().stock === 0 ? 'text-amber-600' : 'text-gray-800'">{{ item().stock }}</p>
+      </div>
+      <div class="rounded-md bg-green-50 p-3">
+        <p class="text-[12px] text-green-700">Purchased</p>
+        <p class="text-[22px] font-semibold text-green-700">+{{ item().purchased }}</p>
+      </div>
+      <div class="rounded-md bg-brand-100/60 p-3">
+        <p class="text-[12px] text-brand-600">Vendor invoices</p>
+        <p class="text-[22px] font-semibold text-brand-600">−{{ item().invoiced }}</p>
+      </div>
+      <div class="rounded-md bg-blue-50 p-3">
+        <p class="text-[12px] text-blue-700">Website orders</p>
+        <p class="text-[22px] font-semibold text-blue-700">{{ item().type === 'product' ? '−' + item().ordered : '—' }}</p>
+      </div>
+    </div>
+
+    <!-- Kind filter -->
+    <div class="mt-5 mb-3 flex flex-wrap gap-2">
+      @for (k of kinds; track k.value) {
+        @if (k.value !== 'order' || item().type === 'product') {
+          <button
+            type="button"
+            (click)="kind.set(k.value)"
+            class="rounded-full px-3 py-1 text-[13px] font-medium transition"
+            [class]="kind() === k.value ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+          >
+            {{ k.label }}
+          </button>
+        }
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="space-y-2">
+        @for (_ of [1, 2, 3, 4]; track $index) {
+          <div class="h-14 animate-pulse rounded-md bg-gray-100"></div>
+        }
+      </div>
+    } @else if (error()) {
+      <p class="text-red-600">{{ error() }}</p>
+    } @else if (!movements().length) {
+      <p class="rounded-md bg-gray-50 px-4 py-8 text-center text-[14px] text-gray-500">No movements yet.</p>
+    } @else {
+      <ul class="divide-y divide-gray-100 rounded-md border border-gray-200">
+        @for (m of movements(); track m.kind + m.ref_id + $index) {
+          <li>
+            <button type="button" (click)="open(m)" class="flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-gray-50">
+              <div class="w-[86px] shrink-0 text-[13px] text-gray-500">{{ formatDate(m.date) }}</div>
+              <div class="min-w-0 flex-1">
+                <p class="flex flex-wrap items-center gap-2">
+                  <span class="rounded px-2 py-0.5 text-[11px] font-medium" [class]="kindClass(m.kind)">{{ kindLabel(m.kind) }}</span>
+                  <span class="font-mono text-[13px] font-medium text-gray-800">{{ m.ref_no }}</span>
+                  <span class="truncate text-[13px] text-gray-600">{{ m.party }}</span>
+                </p>
+                <p class="mt-0.5 truncate text-[12px] text-gray-500">{{ m.detail }}</p>
+              </div>
+              <div class="w-[70px] shrink-0 text-right text-[16px] font-semibold" [class]="m.quantity > 0 ? 'text-green-700' : 'text-gray-800'">
+                {{ m.quantity > 0 ? '+' : '−' }}{{ m.quantity > 0 ? m.quantity : -m.quantity }}
+              </div>
+              <div class="w-[70px] shrink-0 text-right">
+                <p class="text-[11px] text-gray-400">Balance</p>
+                <p class="text-[14px] font-medium" [class]="m.balance < 0 ? 'text-red-600' : 'text-gray-700'">{{ m.balance }}</p>
+              </div>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>

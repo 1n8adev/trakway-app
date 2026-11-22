@@ -1,0 +1,166 @@
+<!-- Summary tiles (click to filter by status) -->
+<div class="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    <p class="text-[13px] font-medium tracking-wide text-gray-500 uppercase">Units on hand</p>
+    <p class="mt-1 text-[26px] font-semibold text-gray-800">{{ summary()?.units ?? '—' }}</p>
+    <p class="text-[13px] text-gray-500">{{ summary()?.total ?? 0 }} items</p>
+  </div>
+  <button
+    type="button"
+    (click)="setStatus('in_stock')"
+    class="rounded-md bg-white p-5 text-left shadow-[0_2px_8px_rgba(47,43,61,0.12)] ring-2 transition hover:shadow-[0_4px_14px_rgba(47,43,61,0.16)]"
+    [class]="status === 'in_stock' ? 'ring-green-500' : 'ring-transparent'"
+    [attr.aria-pressed]="status === 'in_stock'"
+  >
+    <p class="text-[13px] font-medium tracking-wide text-green-700 uppercase">In stock</p>
+    <p class="mt-1 text-[26px] font-semibold text-gray-800">{{ summary()?.in_stock ?? '—' }}</p>
+    <p class="text-[13px] text-gray-500">items available</p>
+  </button>
+  <button
+    type="button"
+    (click)="setStatus('out_of_stock')"
+    class="rounded-md bg-white p-5 text-left shadow-[0_2px_8px_rgba(47,43,61,0.12)] ring-2 transition hover:shadow-[0_4px_14px_rgba(47,43,61,0.16)]"
+    [class]="status === 'out_of_stock' ? 'ring-amber-500' : 'ring-transparent'"
+    [attr.aria-pressed]="status === 'out_of_stock'"
+  >
+    <p class="text-[13px] font-medium tracking-wide text-amber-700 uppercase">Out of stock</p>
+    <p class="mt-1 text-[26px] font-semibold text-gray-800">{{ summary()?.out_of_stock ?? '—' }}</p>
+    <p class="text-[13px] text-gray-500">items at zero</p>
+  </button>
+  <button
+    type="button"
+    (click)="setStatus('negative')"
+    class="rounded-md bg-white p-5 text-left shadow-[0_2px_8px_rgba(47,43,61,0.12)] ring-2 transition hover:shadow-[0_4px_14px_rgba(47,43,61,0.16)]"
+    [class]="status === 'negative' ? 'ring-red-500' : 'ring-transparent'"
+    [attr.aria-pressed]="status === 'negative'"
+  >
+    <p class="text-[13px] font-medium tracking-wide text-red-600 uppercase">Negative</p>
+    <p class="mt-1 text-[26px] font-semibold text-gray-800">{{ summary()?.negative ?? '—' }}</p>
+    <p class="text-[13px] text-gray-500">sold more than purchased</p>
+  </button>
+</div>
+
+<!-- Toolbar -->
+<div class="mb-5 flex flex-wrap items-center gap-3">
+  <div class="inline-flex rounded-md bg-white p-1 shadow-[0_1px_4px_rgba(47,43,61,0.08)]" role="tablist" aria-label="Item type">
+    @for (t of typeTabs; track t.value) {
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="type === t.value"
+        (click)="setType(t.value)"
+        class="rounded px-4 py-2 text-[14px] font-medium transition"
+        [class]="type === t.value ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)]' : 'text-gray-600 hover:text-brand-500'"
+      >
+        {{ t.label }}
+      </button>
+    }
+  </div>
+  <div class="relative w-full sm:ml-auto sm:w-72">
+    <svg class="pointer-events-none absolute top-1/2 left-3.5 h-[18px] w-[18px] -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+    <input
+      type="search"
+      placeholder="Search name or category"
+      [(ngModel)]="search"
+      (ngModelChange)="onSearch($event)"
+      aria-label="Search stock"
+      class="h-[42px] w-full rounded-md border border-gray-300 bg-white pr-3 pl-10 text-[15px] text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+    />
+  </div>
+  @if (hasFilters) {
+    <button type="button" (click)="clearFilters()" class="px-1 text-[14px] font-medium text-brand-500 hover:underline">Clear filters</button>
+  }
+</div>
+
+<!-- Cards -->
+@if (loading() && !items().length) {
+  <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    @for (_ of [1, 2, 3, 4, 5, 6]; track $index) {
+      <div class="h-[230px] animate-pulse rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]"></div>
+    }
+  </div>
+} @else if (error()) {
+  <div class="rounded-md bg-white px-6 py-14 text-center shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    <p class="text-red-600">{{ error() }}</p>
+    <button type="button" class="mt-2 font-medium text-brand-500 hover:underline" (click)="load()">Try again</button>
+  </div>
+} @else if (!items().length) {
+  <div class="rounded-md bg-white px-6 py-14 text-center text-gray-500 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+    {{ hasFilters ? 'No items match your filters.' : 'No products or accessories yet.' }}
+  </div>
+} @else {
+  <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" [class.opacity-60]="loading()">
+    @for (item of items(); track item.type + item.id) {
+      <button
+        type="button"
+        (click)="openHistory(item)"
+        class="group flex flex-col rounded-md bg-white p-5 text-left shadow-[0_2px_8px_rgba(47,43,61,0.12)] transition hover:-translate-y-0.5 hover:shadow-[0_6px_18px_rgba(47,43,61,0.16)] focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none"
+        [attr.aria-label]="item.name + ': ' + item.stock + ' in stock. Open history'"
+      >
+        <!-- Header: image / initials, name, badges -->
+        <div class="flex items-start gap-3">
+          @if (item.image) {
+            <img [src]="assetUrl(item.image)" alt="" class="h-14 w-14 shrink-0 rounded-md border border-gray-100 bg-gray-50 object-contain" loading="lazy" />
+          } @else {
+            <span
+              class="flex h-14 w-14 shrink-0 items-center justify-center rounded-md text-[16px] font-semibold"
+              [class]="item.type === 'accessory' ? 'bg-brand-100 text-brand-600' : 'bg-blue-50 text-blue-700'"
+            >{{ initials(item.name) }}</span>
+          }
+          <div class="min-w-0 flex-1">
+            <p class="line-clamp-2 font-medium text-gray-800 group-hover:text-brand-500">{{ item.name }}</p>
+            <p class="truncate text-[13px] text-gray-500">{{ item.subtitle || '—' }}</p>
+            <div class="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium">
+              <span class="rounded px-1.5 py-0.5" [class]="item.type === 'accessory' ? 'bg-brand-100 text-brand-600' : 'bg-blue-50 text-blue-700'">
+                {{ item.type === 'accessory' ? 'Accessory' : 'Product' }}
+              </span>
+              @if (!item.is_active) {
+                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">Inactive</span>
+              }
+              @if (item.variant_count) {
+                <span class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{{ item.variant_count }} combinations</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Stock -->
+        <div class="mt-4 flex items-end justify-between">
+          <div>
+            <p class="text-[12px] font-medium tracking-wide text-gray-500 uppercase">In stock</p>
+            <p class="text-[32px] leading-tight font-semibold" [class]="stockClass(item.status)">{{ item.stock }}</p>
+          </div>
+          <span class="mb-1.5 rounded px-2.5 py-1 text-[12px] font-medium" [class]="statusClass(item.status)">{{ statusLabel(item.status) }}</span>
+        </div>
+
+        <!-- In / out -->
+        <div class="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3 text-center">
+          <div>
+            <p class="text-[15px] font-semibold text-green-700">+{{ item.purchased }}</p>
+            <p class="text-[11px] text-gray-500">Purchased</p>
+          </div>
+          <div>
+            <p class="text-[15px] font-semibold text-gray-700">−{{ item.invoiced }}</p>
+            <p class="text-[11px] text-gray-500">Invoiced</p>
+          </div>
+          <div>
+            @if (item.type === 'product') {
+              <p class="text-[15px] font-semibold text-gray-700">−{{ item.ordered }}</p>
+              <p class="text-[11px] text-gray-500">Website</p>
+            } @else {
+              <p class="text-[15px] font-semibold text-gray-300">—</p>
+              <p class="text-[11px] text-gray-400">Website</p>
+            }
+          </div>
+        </div>
+
+        @if (!item.supplier_product_count) {
+          <p class="mt-3 rounded bg-amber-50 px-2.5 py-1.5 text-[12px] text-amber-700">No supplier products mapped — purchases can't add stock yet.</p>
+        }
+      </button>
+    }
+  </div>
+}

@@ -106,6 +106,83 @@
           </div>
         </div>
       </div>
+      <!-- Supplier products mapping -->
+      <div class="border-t border-gray-200 pt-5">
+        <div class="mb-2 flex items-end justify-between gap-3">
+          <div>
+            <p class="text-[15px] text-gray-700">Supplier products <span class="text-[13px] text-gray-400">(optional)</span></p>
+            <p class="text-[13px] text-gray-500">Which suppliers' products are this accessory. Their purchases will count as this accessory's stock.</p>
+          </div>
+          <span class="shrink-0 text-[13px] text-gray-500">{{ selected().size }} selected</span>
+        </div>
+
+        @if (selectedRows().length) {
+          <div class="mb-3 flex flex-wrap gap-2">
+            @for (sp of selectedRows(); track sp.id) {
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-100 py-1 pr-1.5 pl-3 text-[13px] text-brand-700">
+                {{ sp.name }} · {{ sp.supplier_name }}
+                <button type="button" (click)="toggle(sp)" class="rounded-full p-0.5 hover:bg-brand-200" [attr.aria-label]="'Unmap ' + sp.name">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </span>
+            }
+          </div>
+        }
+
+        @if (mappableLoading()) {
+          <div class="h-24 animate-pulse rounded-md bg-gray-100"></div>
+        } @else if (mappableError()) {
+          <p class="text-[13px] text-red-600">{{ mappableError() }}</p>
+        } @else if (!mappable().length) {
+          <p class="rounded-md bg-gray-50 px-4 py-3 text-[13px] text-gray-500">No supplier products yet. Add them under Purchases → Supplier Products.</p>
+        } @else {
+          <input
+            type="search"
+            [value]="pickerSearch()"
+            (input)="pickerSearch.set($any($event.target).value)"
+            placeholder="Search supplier product or supplier"
+            aria-label="Search supplier products"
+            class="mb-2 h-[40px] px-3"
+            [class]="FIELD_BASE"
+          />
+          <ul class="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-md border border-gray-200" role="listbox" aria-multiselectable="true" aria-label="Supplier products">
+            @for (sp of pickerRows(); track sp.id) {
+              <li>
+                <label
+                  class="flex items-center gap-3 px-3 py-2.5 text-[14px]"
+                  [class]="mappedElsewhere(sp) ? 'cursor-not-allowed bg-gray-50 text-gray-400' : 'cursor-pointer hover:bg-gray-50'"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="selected().has(sp.id)"
+                    [disabled]="mappedElsewhere(sp)"
+                    (change)="toggle(sp)"
+                    class="h-4 w-4 accent-brand-600"
+                  />
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate" [class.text-gray-800]="!mappedElsewhere(sp)">
+                      {{ sp.name }}
+                      @if (!sp.is_active) {
+                        <span class="text-[12px] text-gray-400">(inactive)</span>
+                      }
+                    </span>
+                    <span class="block truncate text-[12px] text-gray-500">{{ sp.supplier_name }}{{ sp.supplier_is_active ? '' : ' (inactive)' }} · {{ rupees(sp.price) }}</span>
+                  </span>
+                  @if (mappedElsewhere(sp)) {
+                    <span class="max-w-[45%] shrink-0 truncate text-[12px]">Mapped to {{ mappedToLabel(sp) }}</span>
+                  }
+                </label>
+              </li>
+            } @empty {
+              <li class="px-3 py-4 text-center text-[13px] text-gray-500">No supplier products match.</li>
+            }
+          </ul>
+        }
+        @if (mappingError(); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        }
+      </div>
+
       @if (isEdit) {
         <p class="text-[13px] text-gray-400">Changes apply to new invoice lines. Invoices already saved keep their own name, HSN, rate and GST.</p>
       }

@@ -16,6 +16,8 @@ import { Observable, forkJoin, map, of, startWith } from 'rxjs';
 import {
   VENDOR_INVOICE_LIMITS,
   VendorInvoice,
+  VendorInvoiceOptionProduct,
+  VendorInvoiceOptionVariant,
   VendorInvoiceOptions,
   VendorInvoicePayload,
 } from '../../../core/models/vendor-invoice.model';
@@ -34,6 +36,7 @@ export type ItemKind = 'product' | 'accessory' | 'custom';
 type ItemGroup = FormGroup<{
   kind: FormControl<ItemKind>;
   product_id: FormControl<number | null>;
+  variant_id: FormControl<number | null>;
   accessory_id: FormControl<number | null>;
   description: FormControl<string>;
   hsn_sac: FormControl<string>;
@@ -190,7 +193,7 @@ export class InvoiceForm {
 
   constructor() {
     const request: Observable<[VendorInvoiceOptions, VendorInvoice | null]> = forkJoin([
-      this.invoiceService.options(),
+      this.invoiceService.options(this.editId),
       this.editId ? this.invoiceService.getById(this.editId) : of(null),
     ]);
     request.pipe(takeUntilDestroyed()).subscribe({
@@ -240,9 +243,11 @@ export class InvoiceForm {
       terms: inv.terms ?? '',
     });
     for (const item of inv.items) {
+      if (item.variant_id && item.variant_label) this.savedVariantLabels.set(item.variant_id, item.variant_label);
       const group = this.itemGroup({
         kind: item.product_id ? 'product' : item.accessory_id ? 'accessory' : 'custom',
         product_id: item.product_id,
+        variant_id: item.variant_id,
         accessory_id: item.accessory_id,
         description: item.description,
         hsn_sac: item.hsn_sac ?? '',
@@ -260,6 +265,7 @@ export class InvoiceForm {
     return this.fb.group({
       kind: this.fb.nonNullable.control<ItemKind>(v.kind ?? 'product'),
       product_id: this.fb.control<number | null>(v.product_id ?? null),
+      variant_id: this.fb.control<number | null>(v.variant_id ?? null),
       accessory_id: this.fb.control<number | null>(v.accessory_id ?? null),
       description: this.fb.nonNullable.control(v.description ?? '', Validators.maxLength(VENDOR_INVOICE_LIMITS.maxDescription)),
       hsn_sac: this.fb.nonNullable.control(v.hsn_sac ?? '', hsn),
@@ -288,6 +294,47 @@ export class InvoiceForm {
     return (this.options()?.accessories ?? []).some((a) => a.id === id);
   }
 
+  // Labels of combinations on the saved invoice, for ones that are inactive now (not in options).
+  private readonly savedVariantLabels = new Map<number, string>();
+
+  protected productOf(id: number | null): VendorInvoiceOptionProduct | undefined {
+    return id ? this.options()?.products.find((p) => p.id === id) : undefined;
+  }
+
+  // Active combinations of the line's product (empty for products sold without combinations).
+  protected variantsOf(index: number): VendorInvoiceOptionVariant[] {
+    return this.productOf(this.items.at(index).controls.product_id.value)?.variants ?? [];
+  }
+
+  // The line's saved combination when it isn't active any more: { id, label } to keep it selectable.
+  protected inactiveVariant(index: number): { id: number; label: string } | null {
+    const id = this.items.at(index).controls.variant_id.value;
+    if (!id || this.variantsOf(index).some((v) => v.id === id)) return null;
+    return { id, label: this.savedVariantLabels.get(id) ?? 'Saved combination' };
+  }
+
+  // Stock for a product / accessory line: what's available vs. the total asked for that item on this invoice
+  // (several lines can sell the same item). A warning only — the invoice can still be saved.
+  protected stockInfo(index: number): { available: number; requested: number; short: boolean } | null {
+    const rows = this.value().items;
+    const row = rows[index];
+    if (!row) return null;
+    let available: number | undefined;
+    let same: (r: (typeof rows)[number]) => boolean;
+    if (row.kind === 'product' && row.product_id) {
+      available = this.productOf(row.product_id)?.stock;
+      same = (r) => r.kind === 'product' && r.product_id === row.product_id;
+    } else if (row.kind === 'accessory' && row.accessory_id) {
+      available = this.options()?.accessories.find((a) => a.id === row.accessory_id)?.stock;
+      same = (r) => r.kind === 'accessory' && r.accessory_id === row.accessory_id;
+    } else {
+      return null;
+    }
+    if (available === undefined) return null;
+    const requested = round2(rows.filter(same).reduce((sum, r) => sum + (Number(r.quantity) || 0), 0));
+    return { available, requested, short: requested > available };
+  }
+
   // Switching a line's kind clears the other picker; typed values (description, qty, rate...) stay.
   // Lines loaded from a saved invoice keep their type: to change it, remove the line and add a new one.
   private readonly savedLines = new WeakSet<ItemGroup>();
@@ -303,8 +350,9 @@ export class InvoiceForm {
   protected setKind(index: number, kind: ItemKind): void {
     const group = this.items.at(index);
     if (group.controls.kind.value === kind || this.savedLines.has(group)) return;
-    group.patchValue({ kind, product_id: null, accessory_id: null });
+    group.patchValue({ kind, product_id: null, variant_id: null, accessory_id: null });
     group.controls.product_id.setErrors(null);
+    group.controls.variant_id.setErrors(null);
     group.controls.accessory_id.setErrors(null);
     group.markAsDirty();
   }
@@ -333,13 +381,35 @@ export class InvoiceForm {
     const product = this.options()?.products.find((p) => p.id === productId);
     group.controls.product_id.setValue(productId);
     group.controls.product_id.markAsTouched();
+    // A new product means its combination must be picked again (a single one is picked for you).
+    group.controls.variant_id.setValue(product?.variants.length === 1 ? product.variants[0].id : null);
+    group.controls.variant_id.setErrors(null);
     if (!product) return;
+    group.controls.hsn_sac.setValue(group.controls.hsn_sac.value || this.options()!.default_hsn);
+    if (product.variants.length === 1) {
+      this.applyVariant(group, product, product.variants[0]);
+      return;
+    }
     const gst = group.controls.gst_rate.value;
     group.patchValue({
       description: product.name,
-      hsn_sac: group.controls.hsn_sac.value || this.options()!.default_hsn,
-      unit_price: product.price !== null ? round2(product.price / (1 + gst / 100)) : group.controls.unit_price.value,
+      unit_price: product.price !== null && !product.variants.length ? round2(product.price / (1 + gst / 100)) : group.controls.unit_price.value,
     });
+  }
+
+  // Picking the combination fills "Product (1 Year)" and its rate before GST (combination prices include GST).
+  protected onVariant(index: number, raw: string): void {
+    const group = this.items.at(index);
+    const product = this.productOf(group.controls.product_id.value);
+    const variant = product?.variants.find((v) => v.id === Number(raw));
+    group.controls.variant_id.setValue(variant?.id ?? null);
+    group.controls.variant_id.markAsTouched();
+    if (product && variant) this.applyVariant(group, product, variant);
+  }
+
+  private applyVariant(group: ItemGroup, product: VendorInvoiceOptionProduct, variant: VendorInvoiceOptionVariant): void {
+    const gst = group.controls.gst_rate.value;
+    group.patchValue({ description: `${product.name} (${variant.label})`, unit_price: round2(variant.price / (1 + gst / 100)) });
   }
 
   // Terms start as the default (INVOICE_VENDOR_TERMS on the API); this puts them back after edits.
@@ -373,6 +443,7 @@ export class InvoiceForm {
     if (control.hasError('server')) return control.getError('server');
     if (control.hasError('required')) {
       if (field === 'product_id') return 'Select a product';
+      if (field === 'variant_id') return 'Select the combination';
       if (field === 'accessory_id') return 'Select an accessory';
       return field === 'quantity' ? 'Enter quantity' : 'Enter rate';
     }
@@ -414,6 +485,14 @@ export class InvoiceForm {
 
   protected submit(): void {
     this.validateCrossFields();
+    // Product lines whose product has combinations need one picked.
+    this.items.controls.forEach((group, i) => {
+      const c = group.controls.variant_id;
+      if (group.controls.kind.value === 'product' && this.variantsOf(i).length && !c.value) {
+        c.setErrors({ required: true });
+        c.markAsTouched();
+      }
+    });
     if (this.form.invalid || !this.items.length) {
       this.form.markAllAsTouched();
       if (!this.items.length) this.error.set('Add at least one item');
@@ -430,6 +509,7 @@ export class InvoiceForm {
       terms: v.terms.trim() || null,
       items: v.items.map((item) => ({
         product_id: item.kind === 'product' ? item.product_id : null,
+        variant_id: item.kind === 'product' ? item.variant_id : null,
         accessory_id: item.kind === 'accessory' ? item.accessory_id : null,
         description: item.description.trim() || null,
         hsn_sac: item.hsn_sac.trim() || null,

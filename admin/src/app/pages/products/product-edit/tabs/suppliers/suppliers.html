@@ -1,0 +1,113 @@
+<div class="mb-5">
+  <h3 class="text-[16px] font-semibold text-gray-800">Suppliers</h3>
+  <p class="text-[14px] text-gray-500">
+    Which suppliers' products are this product — the supplier's name for it can be different. Their purchases will count as
+    this product's stock; all combinations sell from the same stock.
+  </p>
+</div>
+
+@if (loading()) {
+  <div class="space-y-3">
+    @for (_ of [1, 2, 3]; track $index) {
+      <div class="h-12 animate-pulse rounded-md bg-gray-100"></div>
+    }
+  </div>
+} @else if (loadError()) {
+  <p class="text-red-600">{{ loadError() }}</p>
+} @else if (data(); as d) {
+  @if (error()) {
+    <div class="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+  }
+
+  @if (!d.supplier_products.length) {
+    <p class="rounded-md bg-gray-50 px-4 py-6 text-center text-[14px] text-gray-500">
+      No supplier products yet.
+      <a routerLink="/supplier-products" class="font-medium text-brand-500 hover:underline">Add them under Purchases → Supplier Products</a>.
+    </p>
+  } @else {
+    <!-- Mapped supplier products -->
+    <div class="overflow-x-auto rounded-md border border-gray-200">
+      <table class="w-full min-w-[620px] text-left">
+        <thead>
+          <tr class="border-b border-gray-200 bg-gray-50 text-[12px] font-medium tracking-wide text-gray-600 uppercase">
+            <th class="px-4 py-3 font-medium">Supplier product</th>
+            <th class="px-4 py-3 font-medium">Supplier</th>
+            <th class="px-4 py-3 text-right font-medium">Last rate</th>
+            <th class="w-12 px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="text-[14px]">
+          @for (sp of mapped(); track sp.id) {
+            <tr class="border-b border-gray-100 last:border-b-0">
+              <td class="px-4 py-3">
+                <p class="font-medium text-gray-800">
+                  {{ sp.name }}
+                  @if (!sp.is_active) {
+                    <span class="text-[12px] font-normal text-gray-400">(inactive)</span>
+                  }
+                </p>
+                <p class="font-mono text-[12px] text-gray-500">HSN {{ sp.hsn_code }} · GST {{ sp.gst_rate }}%</p>
+              </td>
+              <td class="px-4 py-3 text-gray-700">{{ sp.supplier_name }}</td>
+              <td class="px-4 py-3 text-right whitespace-nowrap text-gray-700">{{ rupees(sp.price) }}</td>
+              <td class="px-4 py-3 text-right">
+                <button
+                  type="button"
+                  (click)="remove(sp.id)"
+                  class="rounded-full p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                  [attr.aria-label]="'Unmap ' + sp.name"
+                  title="Unmap"
+                >
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="px-4 py-8 text-center text-gray-500">No supplier products mapped yet. Add one below.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Add -->
+    <div class="mt-4 max-w-[520px]">
+      <label for="sup-add" class="mb-2 block text-[14px] text-gray-700">Add a supplier product</label>
+      <select
+        #addSelect
+        id="sup-add"
+        (change)="add($any($event.target).value, addSelect)"
+        class="h-[42px] w-full rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      >
+        <option value="" selected disabled>Choose…</option>
+        @for (g of addGroups(); track g.supplier) {
+          <optgroup [label]="g.supplier">
+            @for (sp of g.items; track sp.id) {
+              <option [value]="'' + sp.id" [disabled]="mappedElsewhere(sp)">
+                {{ sp.name }} — {{ rupees(sp.price) }}{{ sp.is_active ? '' : ' (inactive)' }}{{ mappedElsewhere(sp) ? ' · mapped to ' + mappedToLabel(sp) : '' }}
+              </option>
+            }
+          </optgroup>
+        }
+      </select>
+      <p class="mt-1.5 text-[12px] text-gray-500">Greyed-out ones are already mapped to another product or an accessory; unmap them there first.</p>
+    </div>
+  }
+
+  <div class="mt-6 flex items-center justify-end gap-3 border-t border-gray-200 pt-5">
+    @if (dirty()) {
+      <button type="button" (click)="discard()" [disabled]="saving()" class="h-[42px] rounded-md bg-gray-100 px-5 text-[15px] font-medium text-gray-600 transition hover:bg-gray-200 disabled:opacity-50">
+        Discard
+      </button>
+    }
+    <button
+      type="button"
+      (click)="submit()"
+      [disabled]="saving() || !dirty()"
+      class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {{ saving() ? 'Saving…' : 'Save Suppliers' }}
+    </button>
+  </div>
+}

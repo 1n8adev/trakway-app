@@ -40,8 +40,10 @@ const summary = asyncHandler(async (req, res) => {
   response.success(res, await vendorInvoiceService.summary(filtersFrom(req.query)));
 });
 
+// ?invoice_id= (when editing) leaves that invoice's own lines out of the stock figures.
 const options = asyncHandler(async (req, res) => {
-  response.success(res, await vendorInvoiceService.options());
+  const invoiceId = Number(req.query.invoice_id);
+  response.success(res, await vendorInvoiceService.options(Number.isInteger(invoiceId) && invoiceId > 0 ? invoiceId : null));
 });
 
 const getById = asyncHandler(async (req, res) => {

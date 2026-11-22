@@ -14,8 +14,9 @@ import { SpecificationsTab } from './tabs/specifications/specifications';
 import { HtmlContentTab } from './tabs/html-content/html-content';
 import { CombinationsTab } from './tabs/combinations/combinations';
 import { SeoTab } from './tabs/seo/seo';
+import { SuppliersTab } from './tabs/suppliers/suppliers';
 
-type TabKey = 'basic' | 'benefits' | 'specifications' | 'package' | 'box' | 'combinations' | 'seo';
+type TabKey = 'basic' | 'benefits' | 'specifications' | 'package' | 'box' | 'combinations' | 'suppliers' | 'seo';
 
 interface TabDef {
   key: TabKey;
@@ -28,7 +29,7 @@ interface TabDef {
 // becomes /products/:id/edit and the other tabs unlock. Each tab saves on its own.
 @Component({
   selector: 'app-product-edit',
-  imports: [RouterLink, BasicInfoTab, BenefitsTab, SpecificationsTab, HtmlContentTab, CombinationsTab, SeoTab],
+  imports: [RouterLink, BasicInfoTab, BenefitsTab, SpecificationsTab, HtmlContentTab, CombinationsTab, SuppliersTab, SeoTab],
   templateUrl: './product-edit.html',
 })
 export class ProductEdit implements OnInit {
@@ -47,6 +48,7 @@ export class ProductEdit implements OnInit {
     { key: 'package', label: 'Packages & Details' },
     { key: 'box', label: "What's in the Box" },
     { key: 'combinations', label: 'Combinations', badge: (p) => p.variants?.length ?? 0 },
+    { key: 'suppliers', label: 'Suppliers' },
     { key: 'seo', label: 'SEO' },
   ];
 

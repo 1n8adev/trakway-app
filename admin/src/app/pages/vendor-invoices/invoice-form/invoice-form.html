@@ -246,9 +246,29 @@
                           <option [value]="'' + row.controls.product_id.value" selected>{{ row.controls.description.value || 'Product' }} (inactive)</option>
                         }
                         @for (p of options()?.products ?? []; track p.id) {
-                          <option [value]="'' + p.id" [selected]="p.id === row.controls.product_id.value">{{ p.name }}</option>
+                          <option [value]="'' + p.id" [selected]="p.id === row.controls.product_id.value">{{ p.name }}{{ p.variants.length ? ' · ' + p.variants.length + ' combinations' : '' }}</option>
                         }
                       </select>
+                      <!-- Combination: only for products that have them (accessory / custom lines never do). -->
+                      @if (variantsOf(i).length || inactiveVariant(i)) {
+                        <select
+                          (change)="onVariant(i, $any($event.target).value)"
+                          [attr.aria-label]="'Combination for line ' + (i + 1)"
+                          class="mt-2 h-[40px] px-3"
+                          [class]="FIELD_BASE + ' ' + cellClass(i, 'variant_id')"
+                        >
+                          <option value="" disabled [selected]="!row.controls.variant_id.value">Select the combination</option>
+                          @if (inactiveVariant(i); as iv) {
+                            <option [value]="'' + iv.id" selected>{{ iv.label }} (inactive)</option>
+                          }
+                          @for (v of variantsOf(i); track v.id) {
+                            <option [value]="'' + v.id" [selected]="v.id === row.controls.variant_id.value">{{ v.label }} — {{ rupees(v.price) }} incl. GST{{ v.sku ? ' · ' + v.sku : '' }}</option>
+                          }
+                        </select>
+                        @if (cellError(i, 'variant_id'); as msg) {
+                          <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                        }
+                      }
                     }
                     @case ('accessory') {
                       <select
@@ -311,6 +331,14 @@
                   />
                   @if (cellError(i, 'quantity'); as msg) {
                     <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+                  } @else if (stockInfo(i); as s) {
+                    @if (s.short) {
+                      <p class="mt-1 text-[12px] font-medium text-amber-600" [title]="'This invoice asks for ' + s.requested + '; ' + s.available + ' available. You can still save.'">
+                        Only {{ s.available }} in stock
+                      </p>
+                    } @else {
+                      <p class="mt-1 text-[12px] text-gray-400">{{ s.available }} in stock</p>
+                    }
                   }
                 </td>
                 <td class="px-3 py-3">

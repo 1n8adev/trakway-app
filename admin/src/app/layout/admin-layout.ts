@@ -17,6 +17,10 @@ type NavIcon =
   | 'orders'
   | 'vendors'
   | 'invoices'
+  | 'suppliers'
+  | 'supplier-products'
+  | 'purchases'
+  | 'stock'
   | 'settings';
 
 interface NavSection {
@@ -59,6 +63,15 @@ export class AdminLayout implements OnInit {
         { label: 'Vendors', path: '/vendors', icon: 'vendors' },
         { label: 'Vendor Invoices', path: '/vendor-invoices', icon: 'invoices' },
          { label: 'Product Accessories', path: '/accessories', icon: 'accessories' },
+      ],
+    },
+    {
+      heading: 'Purchases',
+      items: [
+        { label: 'Suppliers', path: '/suppliers', icon: 'suppliers' },
+        { label: 'Supplier Products', path: '/supplier-products', icon: 'supplier-products' },
+        { label: 'Purchases', path: '/purchases', icon: 'purchases' },
+        { label: 'Stock', path: '/stock', icon: 'stock' },
       ],
     },
     {

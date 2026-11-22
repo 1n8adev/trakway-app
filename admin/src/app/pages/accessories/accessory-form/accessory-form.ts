@@ -3,7 +3,14 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { startWith } from 'rxjs';
-import { ACCESSORY_LIMITS, GST_RATES, ProductAccessory, ProductAccessoryPayload } from '../../../core/models/product-accessory.model';
+import {
+  ACCESSORY_LIMITS,
+  GST_RATES,
+  MappableSupplierProduct,
+  ProductAccessory,
+  mappedToLabel,
+  ProductAccessoryPayload,
+} from '../../../core/models/product-accessory.model';
 import { ProductAccessoryService } from '../../../core/services/product-accessory.service';
 import { applyServerErrors, controlError } from '../../../core/utils/form-errors';
 import { getErrorMessage, getFieldErrors } from '../../../core/utils/http-error';
@@ -71,6 +78,63 @@ export class AccessoryForm {
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  // Supplier products mapping: which supplier products are this accessory.
+  protected readonly mappable = signal<MappableSupplierProduct[]>([]);
+  protected readonly mappableLoading = signal(true);
+  protected readonly mappableError = signal<string | null>(null);
+  protected readonly selected = signal<Set<number>>(new Set());
+  protected readonly pickerSearch = signal('');
+  protected readonly mappingError = signal<string | null>(null);
+  private initialSelection = '';
+
+  // Selected ones first, then the rest; filtered by product or supplier name.
+  protected readonly pickerRows = computed(() => {
+    const q = this.pickerSearch().trim().toLowerCase();
+    const sel = this.selected();
+    return this.mappable()
+      .filter((sp) => !q || sp.name.toLowerCase().includes(q) || sp.supplier_name.toLowerCase().includes(q))
+      .sort((x, y) => Number(sel.has(y.id)) - Number(sel.has(x.id)));
+  });
+  protected readonly selectedRows = computed(() => this.mappable().filter((sp) => this.selected().has(sp.id)));
+
+  constructor() {
+    this.accessoryService.supplierProducts().subscribe({
+      next: (rows) => {
+        this.mappable.set(rows);
+        const mine = rows.filter((sp) => this.a && sp.accessory_id === this.a.id).map((sp) => sp.id);
+        this.selected.set(new Set(mine));
+        this.initialSelection = [...mine].sort((x, y) => x - y).join(',');
+        this.mappableLoading.set(false);
+      },
+      error: (err) => {
+        this.mappableLoading.set(false);
+        this.mappableError.set(getErrorMessage(err, 'Could not load supplier products'));
+      },
+    });
+  }
+
+  // Mapped to a different accessory or to a product: can't be picked here (unmap it there first).
+  protected mappedElsewhere(sp: MappableSupplierProduct): boolean {
+    return !!sp.product_id || (!!sp.accessory_id && sp.accessory_id !== this.a?.id);
+  }
+
+  protected readonly mappedToLabel = mappedToLabel;
+
+  protected toggle(sp: MappableSupplierProduct): void {
+    if (this.mappedElsewhere(sp)) return;
+    this.selected.update((set) => {
+      const next = new Set(set);
+      if (next.has(sp.id)) next.delete(sp.id);
+      else next.add(sp.id);
+      return next;
+    });
+    this.mappingError.set(null);
+  }
+
+  private selectionChanged(): boolean {
+    return [...this.selected()].sort((x, y) => x - y).join(',') !== this.initialSelection;
+  }
+
   protected fieldError(field: keyof typeof LABELS): string | null {
     const control = this.form.get(field)!;
     if (!control.touched || !control.errors) return null;
@@ -94,7 +158,7 @@ export class AccessoryForm {
       return;
     }
     const f = this.form.getRawValue();
-    const all: Required<ProductAccessoryPayload> = {
+    const all: Omit<Required<ProductAccessoryPayload>, 'supplier_product_ids'> = {
       name: f.name.trim(),
       price: Number(f.price),
       hsn_code: f.hsn_code.trim(),
@@ -106,6 +170,10 @@ export class AccessoryForm {
     const payload: ProductAccessoryPayload = a
       ? Object.fromEntries(Object.entries(all).filter(([key, value]) => value !== a[key as keyof ProductAccessory]))
       : all;
+    // The mapping is sent only when it changed (and only once the list has loaded).
+    if (!this.mappableLoading() && !this.mappableError() && (a ? this.selectionChanged() : this.selected().size)) {
+      payload.supplier_product_ids = [...this.selected()];
+    }
     if (a && !Object.keys(payload).length) {
       this.dialogRef.close();
       return;
@@ -120,7 +188,9 @@ export class AccessoryForm {
         this.saving.set(false);
         this.dialogRef.disableClose = false;
         this.error.set(getErrorMessage(err, 'Could not save the accessory'));
-        applyServerErrors(this.form, getFieldErrors(err));
+        const fields = getFieldErrors(err);
+        if (fields['supplier_product_ids']) this.mappingError.set(fields['supplier_product_ids']);
+        applyServerErrors(this.form, fields);
       },
     });
   }

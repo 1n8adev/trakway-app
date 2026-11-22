@@ -15,6 +15,10 @@ const vendorRoutes = require('./vendor/vendor.routes');
 const vendorInvoiceRoutes = require('./vendor-invoice/vendor-invoice.routes');
 const vendorInvoiceTypeRoutes = require('./vendor-invoice-type/vendor-invoice-type.routes');
 const productAccessoryRoutes = require('./product-accessory/product-accessory.routes');
+const supplierRoutes = require('./supplier/supplier.routes');
+const supplierProductRoutes = require('./supplier-product/supplier-product.routes');
+const purchaseRoutes = require('./purchase/purchase.routes');
+const stockRoutes = require('./stock/stock.routes');
 const settingRoutes = require('./setting/setting.routes');
 
 const router = express.Router();
@@ -38,6 +42,10 @@ router.use('/vendors', vendorRoutes);
 router.use('/vendor-invoices', vendorInvoiceRoutes);
 router.use('/vendor-invoice-types', vendorInvoiceTypeRoutes);
 router.use('/product-accessories', productAccessoryRoutes);
+router.use('/suppliers', supplierRoutes);
+router.use('/supplier-products', supplierProductRoutes);
+router.use('/purchases', purchaseRoutes);
+router.use('/stock', stockRoutes);
 router.use('/settings', settingRoutes);
 
 module.exports = router;

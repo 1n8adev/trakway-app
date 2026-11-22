@@ -407,7 +407,21 @@ function status(body) {
   return typeof body.is_active === 'boolean' ? {} : { is_active: 'is_active must be true or false' };
 }
 
+// PUT /products/:id/suppliers — { supplier_product_ids: [...] }, the full set mapped to this product.
+const MAX_SUPPLIER_ITEMS = 100;
+function suppliers(body) {
+  const ids = body.supplier_product_ids;
+  if (!Array.isArray(ids)) return { supplier_product_ids: 'supplier_product_ids must be a list' };
+  if (ids.length > MAX_SUPPLIER_ITEMS) return { supplier_product_ids: `At most ${MAX_SUPPLIER_ITEMS} supplier products` };
+  const numbers = ids.map(Number);
+  if (numbers.some((id) => !Number.isInteger(id) || id <= 0)) return { supplier_product_ids: 'supplier_product_ids must be a list of ids' };
+  if (new Set(numbers).size !== numbers.length) return { supplier_product_ids: 'A supplier product is listed twice' };
+  body.supplier_product_ids = numbers;
+  return {};
+}
+
 module.exports = {
+  suppliers,
   variants,
   MIN_IMAGES,
   MAX_IMAGES,

@@ -5,6 +5,7 @@ const { round2 } = require('../../../utils/money');
 const vendorInvoiceRepository = require('./vendor-invoice.repository');
 const { renderVendorInvoicePdf } = require('./vendor-invoice.pdf');
 const settingService = require('../setting/setting.service');
+const stockRepository = require('../stock/stock.repository');
 const { GST_RATES, PAYMENT_METHODS } = require('./vendor-invoice.validation');
 
 const PAYMENT_METHOD_LABELS = {
@@ -113,20 +114,30 @@ async function summary(filters) {
   return vendorInvoiceRepository.summary(filters);
 }
 
-// Everything the invoice form needs in one call.
-async function options() {
-  const [{ types, vendors, products, accessories }, defaultTerms] = await Promise.all([
+// Everything the invoice form needs in one call. invoiceId (when editing) leaves that invoice's own lines out
+// of the stock figures, so the form shows what is available to it.
+async function options(invoiceId = null) {
+  const [{ types, vendors, products, accessories }, defaultTerms, productStock, accessoryStock] = await Promise.all([
     vendorInvoiceRepository.options(),
     settingService.vendorTerms(),
+    stockRepository.productStock(invoiceId),
+    stockRepository.accessoryStock(invoiceId),
   ]);
+  const variants = await vendorInvoiceRepository.variantsOf(products.map((p) => p.id));
   return {
     // Active invoice types (Admin > Settings); one is picked when creating an invoice.
     types,
     vendors,
     // price = website selling price, GST-inclusive; the form converts it to a rate before GST.
-    products,
+    // variants = active combinations (price GST-inclusive too) — a product with any must have one picked.
+    // stock = available units (purchased − invoiced − ordered); shared by all combinations. Shown as a warning only.
+    products: products.map((p) => ({
+      ...p,
+      stock: productStock[p.id] ?? 0,
+      variants: variants.filter((v) => Number(v.product_id) === Number(p.id) && v.is_active).map(({ id, label, sku, price }) => ({ id, label, sku, price })),
+    })),
     // Active product accessories (Admin > Accessories); price is already the rate before GST.
-    accessories,
+    accessories: accessories.map((a) => ({ ...a, stock: accessoryStock[a.id] ?? 0 })),
     seller_state: env.invoice.sellerState,
     gst_rates: GST_RATES,
     default_gst_rate: env.invoice.gstRate,
@@ -149,18 +160,29 @@ async function build(body, { allowInactiveVendorId = null } = {}) {
 
   // A line is a product, an accessory, or custom text; the description defaults to the product / accessory name.
   const idsOf = (key) => [...new Set(body.items.map((i) => i[key]).filter(Boolean))];
-  const [names, accessoryNames] = await Promise.all([
+  const [names, accessoryNames, variants] = await Promise.all([
     vendorInvoiceRepository.productNames(idsOf('product_id')),
     vendorInvoiceRepository.accessoryNames(idsOf('accessory_id')),
+    vendorInvoiceRepository.variantsOf(idsOf('product_id')),
   ]);
   const fieldErrors = {};
   const items = body.items.map((item, i) => {
     if (item.product_id && !names[item.product_id]) fieldErrors[`items.${i}.product_id`] = 'Product not found';
     if (item.accessory_id && !accessoryNames[item.accessory_id]) fieldErrors[`items.${i}.accessory_id`] = 'Accessory not found';
+    // A product with active combinations needs one picked; the chosen one must belong to it.
+    let variant = null;
+    if (item.product_id) {
+      const own = variants.filter((v) => Number(v.product_id) === item.product_id);
+      variant = item.variant_id ? own.find((v) => Number(v.id) === item.variant_id) : null;
+      if (item.variant_id && !variant) fieldErrors[`items.${i}.variant_id`] = 'Not a combination of this product';
+      else if (!item.variant_id && own.some((v) => v.is_active)) fieldErrors[`items.${i}.variant_id`] = 'Select the combination';
+    }
+    const productName = names[item.product_id] && (variant ? `${names[item.product_id]} (${variant.label})` : names[item.product_id]);
     return {
       product_id: item.product_id,
+      variant_id: variant ? variant.id : null,
       accessory_id: item.accessory_id,
-      description: item.description || names[item.product_id] || accessoryNames[item.accessory_id] || '',
+      description: item.description || productName || accessoryNames[item.accessory_id] || '',
       hsn_sac: item.hsn_sac,
       quantity: item.quantity,
       unit_price: item.unit_price,

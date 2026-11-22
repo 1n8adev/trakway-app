@@ -2,11 +2,14 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 import type { ProductEdit } from './pages/products/product-edit/product-edit';
 import type { InvoiceForm } from './pages/vendor-invoices/invoice-form/invoice-form';
+import type { PurchaseForm } from './pages/purchases/purchase-form/purchase-form';
 
 // Asks before leaving the product editor with unsaved changes on the open tab.
 const confirmLeaveProduct = (page: ProductEdit) => page.confirmDiscard();
 // Same for the vendor invoice editor.
 const confirmLeaveInvoice = (page: InvoiceForm) => page.confirmDiscard();
+// And the purchase editor.
+const confirmLeavePurchase = (page: PurchaseForm) => page.confirmDiscard();
 
 export const routes: Routes = [
   {
@@ -78,6 +81,38 @@ export const routes: Routes = [
         path: 'accessories',
         title: 'Accessories · Trakway Admin',
         loadComponent: () => import('./pages/accessories/accessories').then((m) => m.Accessories),
+      },
+      {
+        path: 'suppliers',
+        title: 'Suppliers · Trakway Admin',
+        loadComponent: () => import('./pages/suppliers/suppliers').then((m) => m.Suppliers),
+      },
+      {
+        path: 'supplier-products',
+        title: 'Supplier Products · Trakway Admin',
+        loadComponent: () => import('./pages/supplier-products/supplier-products').then((m) => m.SupplierProducts),
+      },
+      {
+        path: 'purchases',
+        title: 'Purchases · Trakway Admin',
+        loadComponent: () => import('./pages/purchases/purchases').then((m) => m.Purchases),
+      },
+      {
+        path: 'purchases/new',
+        title: 'New Purchase · Trakway Admin',
+        loadComponent: () => import('./pages/purchases/purchase-form/purchase-form').then((m) => m.PurchaseForm),
+        canDeactivate: [confirmLeavePurchase],
+      },
+      {
+        path: 'purchases/:id/edit',
+        title: 'Purchase · Trakway Admin',
+        loadComponent: () => import('./pages/purchases/purchase-form/purchase-form').then((m) => m.PurchaseForm),
+        canDeactivate: [confirmLeavePurchase],
+      },
+      {
+        path: 'stock',
+        title: 'Stock · Trakway Admin',
+        loadComponent: () => import('./pages/stock/stock').then((m) => m.Stock),
       },
       {
         path: 'vendors',

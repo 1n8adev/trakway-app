@@ -1,0 +1,161 @@
+<div class="flex max-h-[90vh] flex-col font-sans">
+  <!-- Header -->
+  <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+    <h2 class="text-[18px] font-semibold text-gray-800">{{ isEdit ? 'Edit Supplier Product' : 'Add Supplier Product' }}</h2>
+    <button
+      type="button"
+      (click)="close()"
+      [disabled]="saving()"
+      class="rounded-md p-1.5 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
+      aria-label="Close"
+    >
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="flex min-h-0 flex-1 flex-col">
+    <div class="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+      @if (error()) {
+        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
+      }
+
+      <div>
+        <label for="product-supplier" class="mb-2 block text-[15px] text-gray-700">Supplier <span class="text-red-500">*</span></label>
+        @if (isEdit) {
+          <p id="product-supplier" class="flex h-[46px] items-center rounded-md border border-gray-200 bg-gray-50 px-4 text-[15px] text-gray-700">{{ supplierName }}</p>
+          <p class="mt-1.5 text-[13px] text-gray-400">The supplier can't be changed. To move it, add the product under the other supplier.</p>
+        } @else {
+          <div class="relative">
+            <select
+              id="product-supplier"
+              formControlName="supplier_id"
+              class="h-[46px] appearance-none pr-11 pl-4"
+              [class]="FIELD_BASE + ' ' + fieldClass('supplier_id')"
+            >
+              <option [ngValue]="null" disabled>Select a supplier</option>
+              @for (s of suppliers; track s.id) {
+                <option [ngValue]="s.id">{{ s.name }}</option>
+              }
+            </select>
+            <svg class="pointer-events-none absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
+          @if (fieldError('supplier_id'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          } @else if (!suppliers.length) {
+            <p class="mt-1.5 text-[13px] text-red-600">No active suppliers. Add one under Purchases → Suppliers first.</p>
+          }
+        }
+      </div>
+
+      <div>
+        <label for="product-name" class="mb-2 block text-[15px] text-gray-700">Product name <span class="text-red-500">*</span></label>
+        <input
+          id="product-name"
+          type="text"
+          formControlName="name"
+          [maxlength]="limits.maxName"
+          placeholder="As on the supplier's invoice, e.g. 4G GPS Unit XYZ"
+          class="h-[46px] px-4"
+          [class]="FIELD_BASE + ' ' + fieldClass('name')"
+        />
+        @if (fieldError('name'); as msg) {
+          <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+        }
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label for="product-price" class="mb-2 block text-[15px] text-gray-700">Purchase price (₹, before GST) <span class="text-red-500">*</span></label>
+          <input
+            id="product-price"
+            type="number"
+            formControlName="price"
+            min="0"
+            step="any"
+            placeholder="0.00"
+            class="h-[46px] px-4"
+            [class]="FIELD_BASE + ' ' + fieldClass('price')"
+          />
+          @if (fieldError('price'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          } @else if (withGst() !== null) {
+            <p class="mt-1.5 text-[13px] text-gray-500">{{ rupees(withGst()) }} with GST</p>
+          }
+        </div>
+
+        <div>
+          <label for="product-gst" class="mb-2 block text-[15px] text-gray-700">GST % <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <select
+              id="product-gst"
+              formControlName="gst_rate"
+              class="h-[46px] appearance-none border-gray-300 pr-11 pl-4 focus:border-brand-600 focus:ring-brand-600/15"
+              [class]="FIELD_BASE"
+            >
+              @for (r of gstRates; track r) {
+                <option [ngValue]="r">{{ r }}%</option>
+              }
+            </select>
+            <svg class="pointer-events-none absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
+        </div>
+
+        <div>
+          <label for="product-hsn" class="mb-2 block text-[15px] text-gray-700">HSN code <span class="text-red-500">*</span></label>
+          <input
+            id="product-hsn"
+            type="text"
+            inputmode="numeric"
+            formControlName="hsn_code"
+            maxlength="8"
+            placeholder="e.g. 85364900"
+            class="h-[46px] px-4 font-mono"
+            [class]="FIELD_BASE + ' ' + fieldClass('hsn_code')"
+          />
+          @if (fieldError('hsn_code'); as msg) {
+            <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="product-status" class="mb-2 block text-[15px] text-gray-700">Status</label>
+          <div class="relative">
+            <select
+              id="product-status"
+              [value]="form.controls.is_active.value ? 'active' : 'inactive'"
+              (change)="form.controls.is_active.setValue($any($event.target).value === 'active')"
+              class="h-[46px] appearance-none border-gray-300 pr-11 pl-4 focus:border-brand-600 focus:ring-brand-600/15"
+              [class]="FIELD_BASE"
+            >
+              <option value="active">Active · can be purchased</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <svg class="pointer-events-none absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
+        </div>
+      </div>
+      @if (isEdit) {
+        <p class="text-[13px] text-gray-400">Changes apply to new purchases. Purchases already saved keep their own name, HSN, rate and GST.</p>
+      }
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
+      <button
+        type="submit"
+        [disabled]="saving()"
+        class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {{ saving() ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Product' }}
+      </button>
+      <button
+        type="button"
+        (click)="close()"
+        [disabled]="saving()"
+        class="h-[42px] rounded-md bg-red-50 px-6 text-[15px] font-medium text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+      >
+        Discard
+      </button>
+    </div>
+  </form>
+</div>

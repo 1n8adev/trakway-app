@@ -48,13 +48,14 @@
         <div class="h-full w-1/3 animate-pulse bg-brand-600"></div>
       </div>
     }
-    <table class="w-full min-w-[820px] text-left">
+    <table class="w-full min-w-[920px] text-left">
       <thead>
         <tr class="border-b border-gray-200 text-[13px] font-medium tracking-wide text-gray-800 uppercase">
           <th class="py-4 pr-4 pl-5 font-medium lg:pl-6">Name</th>
           <th class="px-4 py-4 font-medium">HSN code</th>
           <th class="px-4 py-4 text-right font-medium">Price</th>
           <th class="px-4 py-4 text-right font-medium">GST</th>
+          <th class="px-4 py-4 text-right font-medium">Supplier products</th>
           <th class="px-4 py-4 text-right font-medium">Invoices</th>
           <th class="px-4 py-4 font-medium">Status</th>
           <th class="py-4 pr-5 pl-4 text-right font-medium lg:pr-6">Actions</th>
@@ -64,12 +65,12 @@
         @if (loading() && !accessories().length) {
           @for (_ of [1, 2, 3, 4]; track $index) {
             <tr class="border-b border-gray-200">
-              <td colspan="7" class="px-6 py-4"><div class="h-3.5 w-full animate-pulse rounded bg-gray-100"></div></td>
+              <td colspan="8" class="px-6 py-4"><div class="h-3.5 w-full animate-pulse rounded bg-gray-100"></div></td>
             </tr>
           }
         } @else if (error()) {
           <tr>
-            <td colspan="7" class="px-6 py-14 text-center">
+            <td colspan="8" class="px-6 py-14 text-center">
               <p class="text-red-600">{{ error() }}</p>
               <button type="button" class="mt-2 font-medium text-brand-500 hover:underline" (click)="load()">Try again</button>
             </td>
@@ -86,6 +87,13 @@
                 <p class="text-[13px] text-gray-500">{{ rupees(withGst(a)) }} with GST</p>
               </td>
               <td class="px-4 py-3 text-right text-gray-700">{{ a.gst_rate }}%</td>
+              <td class="px-4 py-3 text-right">
+                @if (a.supplier_product_count) {
+                  <button type="button" (click)="openForm(a)" class="font-medium text-brand-500 hover:underline">{{ a.supplier_product_count }} mapped</button>
+                } @else {
+                  <span class="text-gray-400">Not mapped</span>
+                }
+              </td>
               <td class="px-4 py-3 text-right text-gray-700">{{ a.invoice_count }}</td>
               <td class="px-4 py-3">
                 <button
@@ -131,7 +139,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="7" class="px-6 py-14 text-center text-gray-500">
+              <td colspan="8" class="px-6 py-14 text-center text-gray-500">
                 @if (hasFilters) {
                   No accessories match your filters.
                 } @else {
