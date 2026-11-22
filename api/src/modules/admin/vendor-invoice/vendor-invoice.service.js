@@ -22,8 +22,8 @@ function financialYear(date) {
   return `${start}-${String((start + 1) % 100).padStart(2, '0')}`;
 }
 
-// "TWV/2026-27/0001"
-const invoiceNumber = (fy, seq) => `${env.invoice.vendorPrefix}/${fy}/${String(seq).padStart(4, '0')}`;
+// "<type prefix>/<FY>/<seq>", e.g. "TWV/2026-27/0001" (Sales Invoice), "TWR/2026-27/0001" (Renewal Invoice).
+const invoiceNumber = (prefix, fy, seq) => `${prefix}/${fy}/${String(seq).padStart(4, '0')}`;
 
 const sameState = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
 
@@ -115,14 +115,18 @@ async function summary(filters) {
 
 // Everything the invoice form needs in one call.
 async function options() {
-  const [{ vendors, products }, defaultTerms] = await Promise.all([
+  const [{ types, vendors, products, accessories }, defaultTerms] = await Promise.all([
     vendorInvoiceRepository.options(),
     settingService.vendorTerms(),
   ]);
   return {
+    // Active invoice types (Admin > Settings); one is picked when creating an invoice.
+    types,
     vendors,
     // price = website selling price, GST-inclusive; the form converts it to a rate before GST.
     products,
+    // Active product accessories (Admin > Accessories); price is already the rate before GST.
+    accessories,
     seller_state: env.invoice.sellerState,
     gst_rates: GST_RATES,
     default_gst_rate: env.invoice.gstRate,
@@ -143,14 +147,20 @@ async function build(body, { allowInactiveVendorId = null } = {}) {
     throw ApiError.badRequest('Validation failed', { vendor_id: 'This vendor is inactive' });
   }
 
-  const productIds = [...new Set(body.items.map((i) => i.product_id).filter(Boolean))];
-  const names = await vendorInvoiceRepository.productNames(productIds);
+  // A line is a product, an accessory, or custom text; the description defaults to the product / accessory name.
+  const idsOf = (key) => [...new Set(body.items.map((i) => i[key]).filter(Boolean))];
+  const [names, accessoryNames] = await Promise.all([
+    vendorInvoiceRepository.productNames(idsOf('product_id')),
+    vendorInvoiceRepository.accessoryNames(idsOf('accessory_id')),
+  ]);
   const fieldErrors = {};
   const items = body.items.map((item, i) => {
     if (item.product_id && !names[item.product_id]) fieldErrors[`items.${i}.product_id`] = 'Product not found';
+    if (item.accessory_id && !accessoryNames[item.accessory_id]) fieldErrors[`items.${i}.accessory_id`] = 'Accessory not found';
     return {
       product_id: item.product_id,
-      description: item.description || names[item.product_id] || '',
+      accessory_id: item.accessory_id,
+      description: item.description || names[item.product_id] || accessoryNames[item.accessory_id] || '',
       hsn_sac: item.hsn_sac,
       quantity: item.quantity,
       unit_price: item.unit_price,
@@ -184,17 +194,24 @@ async function build(body, { allowInactiveVendorId = null } = {}) {
   };
 }
 
+// The type is chosen once, here: it decides the number series, so it can't change on edit.
 async function create(body, adminId) {
+  const type = await vendorInvoiceRepository.findType(body.type_id);
+  if (!type || !type.is_active) {
+    throw ApiError.badRequest('Validation failed', { type_id: type ? `${type.name} is inactive` : 'Invoice type not found' });
+  }
   const { invoice, lines } = await build(body);
+  const fy = financialYear(invoice.invoice_date);
   const id = await vendorInvoiceRepository.create(invoice, lines, {
-    financialYear: financialYear(invoice.invoice_date),
-    numberFor: invoiceNumber,
+    typeId: type.id,
+    financialYear: fy,
+    numberFor: (seq) => invoiceNumber(type.prefix, fy, seq),
     createdBy: adminId ?? null,
   });
   return getById(id);
 }
 
-// The invoice number never changes. Cancelled invoices are read-only, and the new total
+// The invoice number and type never change. Cancelled invoices are read-only, and the new total
 // can't drop below what the vendor has already paid.
 async function update(id, body) {
   const existing = await findOrFail(id);
@@ -246,7 +263,8 @@ async function getPdf(id) {
   const invoice = await getById(id);
   const terms = invoice.terms || (await settingService.vendorTerms()) || null;
   const pdf = await renderVendorInvoicePdf({ seller: env.invoice, invoice: { ...invoice, terms } });
-  return { filename: `Invoice-${invoice.invoice_no.replace(/\//g, '-')}.pdf`, pdf };
+  const label = invoice.type_name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'Invoice';
+  return { filename: `${label}-${invoice.invoice_no.replace(/\//g, '-')}.pdf`, pdf };
 }
 
 module.exports = {

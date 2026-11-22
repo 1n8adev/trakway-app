@@ -8,6 +8,7 @@
     @if (invoice(); as inv) {
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 class="text-[22px] font-semibold text-gray-800">{{ inv.invoice_no }}</h1>
+        <span class="rounded bg-blue-50 px-2.5 py-1 text-[13px] font-medium text-blue-700">{{ inv.type_name }}</span>
         @if (inv.status === 'cancelled') {
           <span class="rounded bg-gray-100 px-2.5 py-1 text-[13px] font-medium text-gray-600">Cancelled</span>
         } @else {

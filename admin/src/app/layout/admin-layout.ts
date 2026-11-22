@@ -5,6 +5,7 @@ import { AuthService } from '../core/services/auth.service';
 
 type NavIcon =
   | 'products'
+  | 'accessories'
   | 'categories'
   | 'attributes'
   | 'faqs'
@@ -42,6 +43,7 @@ export class AdminLayout implements OnInit {
         { label: 'Products', path: '/products', icon: 'products' },
         { label: 'Categories', path: '/categories', icon: 'categories' },
         { label: 'Attributes', path: '/attributes', icon: 'attributes' },
+
       ],
     },
     {
@@ -56,6 +58,7 @@ export class AdminLayout implements OnInit {
       items: [
         { label: 'Vendors', path: '/vendors', icon: 'vendors' },
         { label: 'Vendor Invoices', path: '/vendor-invoices', icon: 'invoices' },
+         { label: 'Product Accessories', path: '/accessories', icon: 'accessories' },
       ],
     },
     {

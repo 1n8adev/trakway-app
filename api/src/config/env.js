@@ -53,10 +53,9 @@ module.exports = {
     prefix: process.env.INVOICE_PREFIX || 'TW',
     gstRate: Number(process.env.INVOICE_GST_RATE) || 18,
     hsn: process.env.INVOICE_HSN || '8526',
-    // Vendor invoices (admin > Vendor Invoices): own number series, bank details and default terms.
+    // Vendor invoices (admin > Vendor Invoices): bank details and default terms. Number prefixes are per invoice type (DB).
     // Bank fields left empty are not printed; the bank box is skipped when all are empty.
     // INVOICE_VENDOR_TERMS uses "|" between lines.
-    vendorPrefix: process.env.INVOICE_VENDOR_PREFIX || 'TWV',
     bank: {
       bankName: (process.env.INVOICE_BANK_NAME || '').trim(),
       accountName: (process.env.INVOICE_BANK_ACCOUNT_NAME || '').trim(),
@@ -67,7 +66,7 @@ module.exports = {
     },
     // One point per line; the PDF numbers them. Keep under 2000 characters (the invoice terms limit).
     vendorTerms: (process.env.INVOICE_VENDOR_TERMS || [
-      'Create an online account on the Trak Way tracking platform by providing all relevant information.',
+      'Create an online account on the Trakway tracking platform by providing all relevant information.',
       'Agree to the Terms of Service and Privacy Policy at https://www.trakwaytechnologies.com/privacy-policy.',
       'Delivery within 5 working days after receipt of Purchase Order & payment confirmation.',
       'SMS delay or non-delivery of message(s) depends on the connectivity of the network.',

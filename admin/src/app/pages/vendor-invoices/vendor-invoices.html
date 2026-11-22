@@ -40,6 +40,20 @@
       />
     </div>
     <select
+      [(ngModel)]="typeId"
+      (ngModelChange)="onFilterChange()"
+      aria-label="Filter by invoice type"
+      class="h-[42px] max-w-[200px] rounded-md border border-gray-300 bg-white px-3 pr-8 text-[15px] text-gray-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+    >
+      <option value="">All types</option>
+      @for (t of types(); track t.id) {
+        <option [value]="'' + t.id">{{ t.name }}</option>
+      }
+      @if (typeNotListed) {
+        <option [value]="typeId">Type #{{ typeId }}</option>
+      }
+    </select>
+    <select
       [(ngModel)]="vendorId"
       (ngModelChange)="onFilterChange()"
       aria-label="Filter by vendor"
@@ -100,7 +114,7 @@
       }
       <a
         routerLink="/vendor-invoices/new"
-        [queryParams]="vendorId ? { vendor_id: vendorId } : {}"
+        [queryParams]="{ vendor_id: vendorId || null, type_id: typeId || null }"
         class="flex h-[42px] items-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-5 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 focus-visible:ring-4 focus-visible:ring-brand-600/30 focus-visible:outline-none"
       >
         <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
@@ -155,7 +169,7 @@
             <tr class="border-b border-gray-200 transition hover:bg-gray-50" [class.opacity-60]="inv.status === 'cancelled'">
               <td class="py-3 pr-4 pl-5 lg:pl-6">
                 <a [routerLink]="['/vendor-invoices', inv.id]" class="font-medium text-gray-800 hover:text-brand-500">{{ inv.invoice_no }}</a>
-                <p class="text-[14px] text-gray-500">{{ formatIsoDate(inv.invoice_date) }} · {{ inv.item_count }} {{ inv.item_count === 1 ? 'item' : 'items' }}</p>
+                <p class="text-[14px] text-gray-500"><span class="font-medium text-gray-600">{{ inv.type_name }}</span> · {{ formatIsoDate(inv.invoice_date) }} · {{ inv.item_count }} {{ inv.item_count === 1 ? 'item' : 'items' }}</p>
               </td>
               <td class="px-4 py-3">
                 <p class="max-w-[260px] truncate text-gray-800">{{ inv.bill_name }}</p>

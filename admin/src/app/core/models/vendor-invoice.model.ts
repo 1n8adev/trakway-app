@@ -4,7 +4,9 @@ export type PaymentMethod = 'bank_transfer' | 'upi' | 'cash' | 'cheque' | 'other
 
 export interface VendorInvoiceItem {
   id: number;
+  // At most one is set; neither = custom line.
   product_id: number | null;
+  accessory_id: number | null;
   description: string;
   hsn_sac: string | null;
   quantity: number;
@@ -34,10 +36,36 @@ export interface TaxRateSummary {
   igst: number;
 }
 
+// /api/admin/vendor-invoice-types — Sales Invoice (TWV), Renewal Invoice (TWR), ...
+// Each type numbers its invoices "<prefix>/<FY>/0001"; name is the PDF title.
+export interface VendorInvoiceType {
+  id: number;
+  name: string;
+  prefix: string;
+  is_active: boolean;
+  sort_order: number;
+  // The prefix is locked and the type can't be deleted once this is > 0.
+  invoice_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VendorInvoiceTypePayload {
+  name?: string;
+  prefix?: string;
+  is_active?: boolean;
+}
+
+// Limits from the API's vendor-invoice-type.validation.js.
+export const INVOICE_TYPE_LIMITS = { maxName: 60, prefixPattern: /^[A-Z0-9-]{1,10}$/ } as const;
+
 // List row. bill_* is the vendor as it was when the invoice was last saved.
 export interface VendorInvoiceListItem {
   id: number;
   invoice_no: string;
+  type_id: number;
+  type_name: string;
+  type_prefix: string;
   vendor_id: number;
   invoice_date: string;
   due_date: string | null;
@@ -83,6 +111,7 @@ export interface VendorInvoiceFilters {
   page?: number;
   limit?: number;
   search?: string;
+  type_id?: number;
   vendor_id?: number;
   status?: VendorInvoiceStatus;
   payment_status?: PaymentStatus;
@@ -99,9 +128,13 @@ export interface VendorInvoiceSummary {
 }
 
 export interface VendorInvoiceOptions {
+  // Active invoice types, in their display order.
+  types: { id: number; name: string; prefix: string }[];
   vendors: { id: number; name: string; contact_person: string | null; mobile: string; gstin: string | null; city: string; state: string }[];
   // price: website selling price, GST-inclusive (null when priced per combination).
   products: { id: number; name: string; price: number | null }[];
+  // Active accessories; price is the rate before GST.
+  accessories: { id: number; name: string; price: number; hsn_code: string; gst_rate: number }[];
   seller_state: string;
   gst_rates: number[];
   default_gst_rate: number;
@@ -113,6 +146,7 @@ export interface VendorInvoiceOptions {
 // POST / PUT send the whole invoice; the API calculates every amount.
 export interface VendorInvoiceItemPayload {
   product_id: number | null;
+  accessory_id: number | null;
   description: string | null;
   hsn_sac: string | null;
   quantity: number | string;
@@ -121,6 +155,8 @@ export interface VendorInvoiceItemPayload {
 }
 
 export interface VendorInvoicePayload {
+  // Required on create; fixed afterwards (the API ignores it on update).
+  type_id?: number;
   vendor_id: number;
   invoice_date: string;
   due_date: string | null;

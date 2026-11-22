@@ -5,7 +5,8 @@ const { finalPriceSql } = require('../../../utils/pricing');
 const PAYMENT_STATUS_SQL = `CASE WHEN i.amount_paid >= i.grand_total THEN 'paid'
   WHEN i.amount_paid > 0 THEN 'partial' ELSE 'unpaid' END`;
 
-const INVOICE_COLUMNS = `i.id, i.invoice_no, i.vendor_id, i.invoice_date, i.due_date,
+const INVOICE_COLUMNS = `i.id, i.invoice_no, i.type_id, t.name AS type_name, t.prefix AS type_prefix,
+  i.vendor_id, i.invoice_date, i.due_date,
   i.bill_name, i.bill_contact_person, i.bill_mobile, i.bill_email, i.bill_gstin, i.bill_address,
   i.bill_city, i.bill_state, i.bill_pincode, i.intra_state,
   i.subtotal, i.cgst, i.sgst, i.igst, i.total_tax, i.round_off, i.grand_total, i.amount_paid,
@@ -14,10 +15,12 @@ const INVOICE_COLUMNS = `i.id, i.invoice_no, i.vendor_id, i.invoice_date, i.due_
   i.status, i.notes, i.terms, i.cancelled_at, i.created_at, i.updated_at,
   a.name AS created_by_name`;
 
-const FROM = 'FROM vendor_invoices i LEFT JOIN admin_users a ON a.id = i.created_by';
+const FROM = `FROM vendor_invoices i
+  JOIN vendor_invoice_types t ON t.id = i.type_id
+  LEFT JOIN admin_users a ON a.id = i.created_by`;
 
-// Filters: search (invoice no, vendor name, GSTIN, mobile), vendorId, status, paymentStatus, from/to (invoice_date).
-function whereClause({ search, vendorId, status, paymentStatus, from, to }) {
+// Filters: search (invoice no, vendor name, GSTIN, mobile), typeId, vendorId, status, paymentStatus, from/to (invoice_date).
+function whereClause({ search, typeId, vendorId, status, paymentStatus, from, to }) {
   const conditions = [];
   const params = [];
   const add = (sql, value) => {
@@ -29,6 +32,7 @@ function whereClause({ search, vendorId, status, paymentStatus, from, to }) {
     const p = `$${params.length}`;
     conditions.push(`(i.invoice_no ILIKE ${p} OR i.bill_name ILIKE ${p} OR i.bill_gstin ILIKE ${p} OR i.bill_mobile ILIKE ${p})`);
   }
+  if (typeId) add('i.type_id = ?', typeId);
   if (vendorId) add('i.vendor_id = ?', vendorId);
   if (status) add('i.status = ?', status);
   if (paymentStatus) add(`(${PAYMENT_STATUS_SQL}) = ?`, paymentStatus);
@@ -74,7 +78,7 @@ async function findById(id) {
 
 async function findItems(invoiceId) {
   const { rows } = await db.query(
-    `SELECT id, product_id, description, hsn_sac, quantity, unit_price, gst_rate, taxable_value, tax_amount, line_total
+    `SELECT id, product_id, accessory_id, description, hsn_sac, quantity, unit_price, gst_rate, taxable_value, tax_amount, line_total
      FROM vendor_invoice_items WHERE invoice_id = $1 ORDER BY sort_order, id`,
     [invoiceId],
   );
@@ -90,9 +94,10 @@ async function findPayments(invoiceId) {
   return rows;
 }
 
-// Active vendors and active products for the invoice form's pickers.
+// Active types, vendors, products and accessories for the invoice form's pickers.
 async function options() {
-  const [vendors, products] = await Promise.all([
+  const [types, vendors, products, accessories] = await Promise.all([
+    db.query('SELECT id, name, prefix FROM vendor_invoice_types WHERE is_active = TRUE ORDER BY sort_order, id'),
     db.query(
       `SELECT id, name, contact_person, mobile, gstin, city, state
        FROM vendors WHERE is_active = TRUE ORDER BY name`,
@@ -101,8 +106,14 @@ async function options() {
       `SELECT p.id, p.name, ${finalPriceSql('p')} AS price
        FROM products p WHERE p.is_active = TRUE ORDER BY p.name`,
     ),
+    db.query('SELECT id, name, price, hsn_code, gst_rate FROM product_accessories WHERE is_active = TRUE ORDER BY name'),
   ]);
-  return { vendors: vendors.rows, products: products.rows };
+  return { types: types.rows, vendors: vendors.rows, products: products.rows, accessories: accessories.rows };
+}
+
+async function findType(id) {
+  const { rows } = await db.query('SELECT id, name, prefix, is_active FROM vendor_invoice_types WHERE id = $1', [id]);
+  return rows[0] || null;
 }
 
 async function findVendor(id) {
@@ -121,10 +132,17 @@ async function productNames(ids) {
   return Object.fromEntries(rows.map((r) => [r.id, r.name]));
 }
 
+// { id: name } for the given accessory ids that exist.
+async function accessoryNames(ids) {
+  if (!ids.length) return {};
+  const { rows } = await db.query('SELECT id, name FROM product_accessories WHERE id = ANY($1::BIGINT[])', [ids]);
+  return Object.fromEntries(rows.map((r) => [r.id, r.name]));
+}
+
 const INVOICE_WRITABLE = ['vendor_id', 'invoice_date', 'due_date', 'bill_name', 'bill_contact_person', 'bill_mobile',
   'bill_email', 'bill_gstin', 'bill_address', 'bill_city', 'bill_state', 'bill_pincode', 'intra_state',
   'subtotal', 'cgst', 'sgst', 'igst', 'total_tax', 'round_off', 'grand_total', 'notes', 'terms'];
-const ITEM_WRITABLE = ['product_id', 'description', 'hsn_sac', 'quantity', 'unit_price', 'gst_rate',
+const ITEM_WRITABLE = ['product_id', 'accessory_id', 'description', 'hsn_sac', 'quantity', 'unit_price', 'gst_rate',
   'taxable_value', 'tax_amount', 'line_total', 'sort_order'];
 
 async function insertItems(client, invoiceId, items) {
@@ -137,17 +155,17 @@ async function insertItems(client, invoiceId, items) {
   }
 }
 
-// Creates the invoice with the next number of its financial year. numberFor(financialYear, seq) builds the text.
-async function create(invoice, items, { financialYear, numberFor, createdBy }) {
+// Creates the invoice with the next number of its type + financial year. numberFor(seq) builds the text.
+async function create(invoice, items, { typeId, financialYear, numberFor, createdBy }) {
   return db.withTransaction(async (client) => {
     const seq = await client.query(
-      `INSERT INTO vendor_invoice_sequences (financial_year, last_number) VALUES ($1, 1)
-       ON CONFLICT (financial_year) DO UPDATE SET last_number = vendor_invoice_sequences.last_number + 1
+      `INSERT INTO vendor_invoice_sequences (type_id, financial_year, last_number) VALUES ($1, $2, 1)
+       ON CONFLICT (type_id, financial_year) DO UPDATE SET last_number = vendor_invoice_sequences.last_number + 1
        RETURNING last_number`,
-      [financialYear],
+      [typeId, financialYear],
     );
-    const columns = ['invoice_no', ...INVOICE_WRITABLE, 'created_by'];
-    const values = [numberFor(financialYear, seq.rows[0].last_number), ...INVOICE_WRITABLE.map((k) => invoice[k]), createdBy];
+    const columns = ['invoice_no', 'type_id', ...INVOICE_WRITABLE, 'created_by'];
+    const values = [numberFor(seq.rows[0].last_number), typeId, ...INVOICE_WRITABLE.map((k) => invoice[k]), createdBy];
     const { rows } = await client.query(
       `INSERT INTO vendor_invoices (${columns.join(', ')})
        VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')})
@@ -225,7 +243,9 @@ module.exports = {
   findPayments,
   options,
   findVendor,
+  findType,
   productNames,
+  accessoryNames,
   create,
   update,
   cancel,

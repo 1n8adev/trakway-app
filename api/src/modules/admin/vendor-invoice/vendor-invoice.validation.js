@@ -33,10 +33,13 @@ function normalize(req, res, next) {
   for (const key of ['invoice_date', 'due_date', 'notes', 'terms', 'paid_on', 'method', 'reference']) {
     if (body[key] !== undefined) body[key] = trimOrNull(body[key]);
   }
-  if (body.vendor_id !== undefined && body.vendor_id !== null && body.vendor_id !== '') body.vendor_id = Number(body.vendor_id);
+  for (const key of ['vendor_id', 'type_id']) {
+    if (body[key] !== undefined && body[key] !== null && body[key] !== '') body[key] = Number(body[key]);
+  }
   if (Array.isArray(body.items)) {
     body.items = body.items.map((item) => ({
       product_id: item?.product_id === undefined || item?.product_id === null || item?.product_id === '' ? null : Number(item.product_id),
+      accessory_id: item?.accessory_id === undefined || item?.accessory_id === null || item?.accessory_id === '' ? null : Number(item.accessory_id),
       description: trimOrNull(item?.description),
       hsn_sac: trimOrNull(item?.hsn_sac),
       quantity: item?.quantity,
@@ -55,7 +58,8 @@ function textError(errors, key, value, label) {
 }
 
 // POST / PUT — the whole invoice: { vendor_id, invoice_date, due_date?, notes?, terms?, items: [...] }.
-// Item: { product_id?, description (optional when product_id is set), hsn_sac?, quantity, unit_price, gst_rate }.
+// Item: { product_id? | accessory_id? (at most one; neither = custom line), description (optional when either is set),
+//         hsn_sac?, quantity, unit_price, gst_rate }.
 function invoice(body) {
   const errors = {};
   if (!Number.isInteger(body.vendor_id) || body.vendor_id <= 0) errors.vendor_id = 'Select a vendor';
@@ -78,8 +82,12 @@ function invoice(body) {
       if (item.product_id !== null && (!Number.isInteger(item.product_id) || item.product_id <= 0)) {
         errors[at('product_id')] = 'Invalid product';
       }
+      if (item.accessory_id !== null && (!Number.isInteger(item.accessory_id) || item.accessory_id <= 0)) {
+        errors[at('accessory_id')] = 'Invalid accessory';
+      }
+      if (item.product_id !== null && item.accessory_id !== null) errors[at('accessory_id')] = 'A line is either a product or an accessory';
       if (item.description === null) {
-        if (item.product_id === null) errors[at('description')] = 'Select a product or enter a description';
+        if (item.product_id === null && item.accessory_id === null) errors[at('description')] = 'Select a product or accessory, or enter a description';
       } else if (typeof item.description !== 'string' || item.description.length > LIMITS.description) {
         errors[at('description')] = `Description must be at most ${LIMITS.description} characters`;
       }
@@ -96,6 +104,13 @@ function invoice(body) {
   return errors;
 }
 
+// POST / — the invoice plus its type_id (fixed after creation; PUT ignores it).
+function create(body) {
+  const errors = invoice(body);
+  if (!Number.isInteger(body.type_id) || body.type_id <= 0) errors.type_id = 'Select an invoice type';
+  return errors;
+}
+
 // POST /:id/payments — { paid_on, amount, method, reference? }
 function payment(body) {
   const errors = {};
@@ -106,4 +121,4 @@ function payment(body) {
   return errors;
 }
 
-module.exports = { GST_RATES, PAYMENT_METHODS, normalize, invoice, payment };
+module.exports = { GST_RATES, PAYMENT_METHODS, normalize, invoice, create, payment };

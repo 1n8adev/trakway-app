@@ -10,16 +10,20 @@
     </a>
     <h1 class="text-[22px] font-semibold text-gray-800">
       @if (isEdit) {
-        Edit {{ invoice()?.invoice_no }}
+        Edit {{ invoice()?.type_name }} {{ invoice()?.invoice_no }}
       } @else {
-        New Invoice
+        New {{ selectedType()?.name ?? 'Invoice' }}
       }
     </h1>
     <p class="text-[14px] text-gray-500">
       @if (isEdit) {
         The invoice number stays the same. Vendor details are refreshed from the vendor when you save.
       } @else {
-        The invoice number is assigned when you save.
+        @if (numberPreview(); as n) {
+          Numbered <span class="font-mono">{{ n }}</span> — the number is assigned when you save.
+        } @else {
+          Choose the invoice type first. The number is assigned when you save.
+        }
       }
     </p>
   </div>
@@ -41,6 +45,52 @@
     @if (error()) {
       <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
     }
+
+    <!-- Invoice type: asked on create, read-only when editing -->
+    <section class="rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:p-6">
+      <div class="mb-3 flex items-end justify-between">
+        <p id="inv-type-label" class="text-[15px] text-gray-700">
+          Invoice type
+          @if (!isEdit) {
+            <span class="text-red-500">*</span>
+          }
+        </p>
+        @if (!isEdit) {
+          <a routerLink="/settings/invoice" class="text-[13px] font-medium text-brand-500 hover:underline">Manage types</a>
+        }
+      </div>
+      <div class="flex flex-wrap gap-3" role="radiogroup" aria-labelledby="inv-type-label">
+        @for (t of types(); track t.id) {
+          <button
+            type="button"
+            role="radio"
+            [attr.aria-checked]="selectedType()?.id === t.id"
+            (click)="selectType(t.id)"
+            [disabled]="isEdit"
+            class="min-w-[180px] rounded-md border px-4 py-3 text-left transition disabled:cursor-default"
+            [class]="
+              selectedType()?.id === t.id
+                ? 'border-brand-600 bg-brand-100/40 ring-2 ring-brand-600/15'
+                : 'border-gray-300 bg-white hover:border-brand-600'
+            "
+          >
+            <span class="block font-medium text-gray-800">{{ t.name }}</span>
+            <span class="block font-mono text-[13px] text-gray-500">{{ t.prefix }}/…</span>
+          </button>
+        }
+      </div>
+      @if (fieldError('type_id'); as msg) {
+        <p class="mt-1.5 text-[13px] text-red-600">{{ msg }}</p>
+      }
+      @if (!types().length) {
+        <p class="mt-1.5 text-[13px] text-gray-500">
+          No active invoice types. <a routerLink="/settings/invoice" class="font-medium text-brand-500 hover:underline">Add or activate one</a> first.
+        </p>
+      }
+      @if (isEdit) {
+        <p class="mt-2 text-[13px] text-gray-400">The type can't change after the invoice is created.</p>
+      }
+    </section>
 
     <!-- Vendor + dates -->
     <section class="grid grid-cols-1 gap-5 rounded-md bg-white p-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)] lg:grid-cols-3 lg:p-6">
@@ -136,7 +186,7 @@
       <div class="flex items-center justify-between px-5 py-4 lg:px-6">
         <div>
           <h2 class="text-[17px] font-semibold text-gray-800">Items</h2>
-          <p class="text-[13px] text-gray-500">Pick a product or choose “Custom item” and type a description. Rates are before GST.</p>
+          <p class="text-[13px] text-gray-500">Each line is a product, an accessory, or a custom item. Rates are before GST.</p>
         </div>
         <span class="text-[13px] text-gray-400">{{ items.length }} / {{ limits.maxItems }}</span>
       </div>
@@ -146,7 +196,7 @@
           <thead>
             <tr class="border-b border-gray-200 text-[12px] font-medium tracking-wide text-gray-600 uppercase">
               <th class="w-10 py-3 pl-5 font-medium lg:pl-6">#</th>
-              <th class="px-3 py-3 font-medium">Product / description</th>
+              <th class="px-3 py-3 font-medium">Item</th>
               <th class="w-[110px] px-3 py-3 font-medium">HSN / SAC</th>
               <th class="w-[96px] px-3 py-3 font-medium">Qty</th>
               <th class="w-[130px] px-3 py-3 font-medium">Rate (₹)</th>
@@ -160,27 +210,77 @@
               <tr class="border-b border-gray-100 align-top" [formGroupName]="i">
                 <td class="py-3 pl-5 text-[14px] text-gray-500 lg:pl-6"><span class="inline-block pt-2.5">{{ i + 1 }}</span></td>
                 <td class="px-3 py-3">
-                  <select
-                    (change)="onProduct(i, $any($event.target).value)"
-                    [attr.aria-label]="'Product for line ' + (i + 1)"
-                    class="h-[40px] px-3 border-gray-300 focus:border-brand-600 focus:ring-brand-600/15"
-                    [class]="FIELD_BASE"
-                  >
-                    <option value="" [selected]="!row.controls.product_id.value">Custom item (type below)</option>
-                    @for (p of options()?.products ?? []; track p.id) {
-                      <option [value]="'' + p.id" [selected]="p.id === row.controls.product_id.value">{{ p.name }}</option>
+                  <!-- Line kind: product / accessory / custom. Saved lines keep theirs (remove + add a line to change it). -->
+                  @if (isSavedLine(i)) {
+                    <p class="mb-2 flex items-center gap-2 text-[13px]">
+                      <span class="rounded bg-gray-100 px-2.5 py-1 font-medium text-gray-700">{{ kindLabel(row.controls.kind.value) }}</span>
+                      <span class="text-gray-400">To change the type, remove this line and add a new one.</span>
+                    </p>
+                  } @else {
+                  <div class="mb-2 inline-flex rounded-md border border-gray-300 p-0.5 text-[13px]" role="radiogroup" [attr.aria-label]="'Item type for line ' + (i + 1)">
+                    @for (k of itemKinds; track k.value) {
+                      <button
+                        type="button"
+                        role="radio"
+                        [attr.aria-checked]="row.controls.kind.value === k.value"
+                        (click)="setKind(i, k.value)"
+                        class="rounded px-3 py-1 font-medium transition"
+                        [class]="row.controls.kind.value === k.value ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-100'"
+                      >
+                        {{ k.label }}
+                      </button>
                     }
-                  </select>
+                  </div>
+                  }
+
+                  @switch (row.controls.kind.value) {
+                    @case ('product') {
+                      <select
+                        (change)="onProduct(i, $any($event.target).value)"
+                        [attr.aria-label]="'Product for line ' + (i + 1)"
+                        class="h-[40px] px-3"
+                        [class]="FIELD_BASE + ' ' + cellClass(i, 'product_id')"
+                      >
+                        <option value="" disabled [selected]="!row.controls.product_id.value">Select a product</option>
+                        @if (row.controls.product_id.value && !hasProduct(row.controls.product_id.value)) {
+                          <option [value]="'' + row.controls.product_id.value" selected>{{ row.controls.description.value || 'Product' }} (inactive)</option>
+                        }
+                        @for (p of options()?.products ?? []; track p.id) {
+                          <option [value]="'' + p.id" [selected]="p.id === row.controls.product_id.value">{{ p.name }}</option>
+                        }
+                      </select>
+                    }
+                    @case ('accessory') {
+                      <select
+                        (change)="onAccessory(i, $any($event.target).value)"
+                        [attr.aria-label]="'Accessory for line ' + (i + 1)"
+                        class="h-[40px] px-3"
+                        [class]="FIELD_BASE + ' ' + cellClass(i, 'accessory_id')"
+                      >
+                        <option value="" disabled [selected]="!row.controls.accessory_id.value">Select an accessory</option>
+                        @if (row.controls.accessory_id.value && !hasAccessory(row.controls.accessory_id.value)) {
+                          <option [value]="'' + row.controls.accessory_id.value" selected>{{ row.controls.description.value || 'Accessory' }} (inactive)</option>
+                        }
+                        @for (a of options()?.accessories ?? []; track a.id) {
+                          <option [value]="'' + a.id" [selected]="a.id === row.controls.accessory_id.value">{{ a.name }} — {{ rupees(a.price) }}</option>
+                        }
+                      </select>
+                      @if (!(options()?.accessories ?? []).length) {
+                        <p class="mt-1 text-[12px] text-gray-500">No active accessories. <a routerLink="/accessories" class="font-medium text-brand-500 hover:underline">Add one</a>.</p>
+                      }
+                    }
+                  }
                   <input
                     type="text"
                     formControlName="description"
                     [maxlength]="limits.maxDescription"
-                    [placeholder]="row.controls.product_id.value ? 'Description (defaults to the product name)' : 'e.g. Landing page design'"
+                    [placeholder]="row.controls.kind.value === 'custom' ? 'Type the item, e.g. Installation charge' : 'Description (defaults to the ' + row.controls.kind.value + ' name)'"
                     [attr.aria-label]="'Description for line ' + (i + 1)"
-                    class="mt-2 h-[40px] px-3"
+                    class="h-[40px] px-3"
+                    [class.mt-2]="row.controls.kind.value !== 'custom'"
                     [class]="FIELD_BASE + ' ' + cellClass(i, 'description')"
                   />
-                  @if (cellError(i, 'description') || cellError(i, 'product_id'); as msg) {
+                  @if (cellError(i, 'product_id') || cellError(i, 'accessory_id') || cellError(i, 'description'); as msg) {
                     <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
                   }
                 </td>

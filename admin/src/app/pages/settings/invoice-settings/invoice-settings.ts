@@ -10,11 +10,13 @@ import { ToastService } from '../../../core/services/toast.service';
 import { getErrorMessage, getFieldErrors } from '../../../core/utils/http-error';
 import { FIELD_BASE, fieldState } from '../../../core/utils/ui';
 import { ConfirmDialog, ConfirmDialogData } from '../../../shared/confirm-dialog/confirm-dialog';
+import { InvoiceTypes } from '../invoice-types/invoice-types';
 
-// Default terms & conditions that new vendor invoices start with (and that print on invoices saved without terms).
+// Vendor invoice types, plus the default terms & conditions that new vendor invoices start with
+// (and that print on invoices saved without terms).
 @Component({
   selector: 'app-invoice-settings',
-  imports: [DatePipe, ReactiveFormsModule],
+  imports: [DatePipe, ReactiveFormsModule, InvoiceTypes],
   templateUrl: './invoice-settings.html',
 })
 export class InvoiceSettingsPage {
@@ -90,7 +92,7 @@ export class InvoiceSettingsPage {
       .open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
         data: {
           title: 'Restore default terms?',
-          message: 'Your edited terms will be replaced with the built-in Trak Way terms. Invoices already saved keep their own terms.',
+          message: 'Your edited terms will be replaced with the built-in Trakway terms. Invoices already saved keep their own terms.',
           confirmText: 'Restore',
         },
         width: '460px',

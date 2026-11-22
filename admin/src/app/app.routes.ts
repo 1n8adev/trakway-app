@@ -75,6 +75,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/orders/order-detail/order-detail').then((m) => m.OrderDetail),
       },
       {
+        path: 'accessories',
+        title: 'Accessories · Trakway Admin',
+        loadComponent: () => import('./pages/accessories/accessories').then((m) => m.Accessories),
+      },
+      {
         path: 'vendors',
         title: 'Vendors · Trakway Admin',
         loadComponent: () => import('./pages/vendors/vendors').then((m) => m.Vendors),

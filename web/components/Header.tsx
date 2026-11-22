@@ -23,9 +23,9 @@ export default function Header() {
         <Link href="/" className="shrink-0" onClick={() => setIsMenuOpen(false)}>
           <Image
             src="/images/trakway-technologies.png"
-            alt="Trak Way Technologies"
-            width={1200}
-            height={300}
+            alt="Trakway Technologies"
+            width={812}
+            height={205}
             className="h-16 w-auto"
             priority
           />

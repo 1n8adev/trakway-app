@@ -13,7 +13,7 @@ router.get('/summary', vendorInvoiceController.summary);
 router.get('/options', vendorInvoiceController.options);
 router.get('/:id', vendorInvoiceController.getById);
 router.get('/:id/pdf', vendorInvoiceController.pdf);
-router.post('/', normalize, validate(vendorInvoiceValidation.invoice), vendorInvoiceController.create);
+router.post('/', normalize, validate(vendorInvoiceValidation.create), vendorInvoiceController.create);
 router.put('/:id', normalize, validate(vendorInvoiceValidation.invoice), vendorInvoiceController.update);
 router.patch('/:id/cancel', vendorInvoiceController.cancel);
 router.post('/:id/payments', normalize, validate(vendorInvoiceValidation.payment), vendorInvoiceController.addPayment);

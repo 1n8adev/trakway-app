@@ -13,6 +13,8 @@ const orderRoutes = require('./order/order.routes');
 const clientLogoRoutes = require('./client-logo/client-logo.routes');
 const vendorRoutes = require('./vendor/vendor.routes');
 const vendorInvoiceRoutes = require('./vendor-invoice/vendor-invoice.routes');
+const vendorInvoiceTypeRoutes = require('./vendor-invoice-type/vendor-invoice-type.routes');
+const productAccessoryRoutes = require('./product-accessory/product-accessory.routes');
 const settingRoutes = require('./setting/setting.routes');
 
 const router = express.Router();
@@ -34,6 +36,8 @@ router.use('/orders', orderRoutes);
 router.use('/client-logos', clientLogoRoutes);
 router.use('/vendors', vendorRoutes);
 router.use('/vendor-invoices', vendorInvoiceRoutes);
+router.use('/vendor-invoice-types', vendorInvoiceTypeRoutes);
+router.use('/product-accessories', productAccessoryRoutes);
 router.use('/settings', settingRoutes);
 
 module.exports = router;

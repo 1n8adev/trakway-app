@@ -10,7 +10,7 @@ const ASSETS = path.join(__dirname, '..', '..', '..', 'assets');
 // Both images have wide empty margins; the artwork sits in the given box (px) and the rest is cropped.
 const LOGO = {
   file: path.join(ASSETS, 'invoice-logo.png'),
-  width: 2084, x: 30, y: 280, artWidth: 2025, artHeight: 480,
+  width: 2084, x: 30, y: 280, artWidth: 1958, artHeight: 486,
 };
 // Authorised signatory's signature, printed above "Authorised Signatory". Drawn whole and scaled to
 // fit its box, so any replacement image shows in full (crop tight margins in the image itself).
@@ -81,7 +81,7 @@ function renderVendorInvoicePdf({ seller, invoice }) {
       size: 'A4',
       margin: 0, // positions are absolute
       bufferPages: true, // footer ("Page x of y") is drawn on every page at the end
-      info: { Title: `Tax Invoice ${invoice.invoice_no}`, Author: seller.sellerName, Subject: invoice.bill_name },
+      info: { Title: `${invoice.type_name} ${invoice.invoice_no}`, Author: seller.sellerName, Subject: invoice.bill_name },
     });
     const chunks = [];
     doc.on('data', (chunk) => chunks.push(chunk));
@@ -94,7 +94,7 @@ function renderVendorInvoicePdf({ seller, invoice }) {
       doc.addPage();
       const h = drawLogo(doc, MARGIN, MARGIN, 120);
       doc.font('Helvetica').fontSize(9).fillColor(MUTED)
-        .text(`Invoice ${invoice.invoice_no}`, MARGIN, MARGIN + 8, { width: CONTENT_WIDTH, align: 'right' });
+        .text(`${invoice.type_name} ${invoice.invoice_no}`, MARGIN, MARGIN + 8, { width: CONTENT_WIDTH, align: 'right' });
       y = MARGIN + Math.max(h, 20) + 10;
       doc.moveTo(MARGIN, y).lineTo(RIGHT, y).strokeColor(LINE).lineWidth(0.75).stroke();
       y += 14;
@@ -107,13 +107,13 @@ function renderVendorInvoicePdf({ seller, invoice }) {
       y = doc.y + 4;
     }
 
-    // ---- header: logo (left), title + meta (right), orange rule ----
+    // ---- header: logo (left), title (the invoice type, e.g. SALES INVOICE) + meta (right), orange rule ----
     const logoHeight = drawLogo(doc, MARGIN, y + 4, 190);
-    doc.font('Helvetica-Bold').fontSize(20).fillColor(INK).text('TAX INVOICE', MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(20).fillColor(INK).text(invoice.type_name.toUpperCase(), MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
     let metaY = y + 28;
     const meta = [
-      ['Invoice No', invoice.invoice_no],
-      ['Invoice Date', formatDate(invoice.invoice_date)],
+      ['Number', invoice.invoice_no],
+      ['Date', formatDate(invoice.invoice_date)],
       ...(invoice.due_date ? [['Due Date', formatDate(invoice.due_date)]] : []),
     ];
     for (const [label, value] of meta) {
@@ -264,7 +264,16 @@ function renderVendorInvoicePdf({ seller, invoice }) {
       y += 12;
     }
 
-    // ---- bank details + notes (left), signature (right) ----
+    // ---- notes (full width), above the bank details + signature ----
+    if (invoice.notes) {
+      doc.font('Helvetica').fontSize(8.5);
+      ensure(doc.heightOfString(invoice.notes, { width: CONTENT_WIDTH }) + 24);
+      sectionTitle('NOTES');
+      doc.font('Helvetica').fontSize(8.5).fillColor(TEXT).text(invoice.notes, MARGIN, y, { width: CONTENT_WIDTH, lineGap: 1.5 });
+      y = doc.y + 14;
+    }
+
+    // ---- bank details (left), signature (right) ----
     const leftWidth = CONTENT_WIDTH - 200;
     const bank = seller.bank;
     const bankRows = [
@@ -277,9 +286,7 @@ function renderVendorInvoicePdf({ seller, invoice }) {
     ].filter(([, value]) => value);
     const BANK_ROW = 14;
     const bankHeight = bankRows.length ? bankRows.length * BANK_ROW + 38 : 0;
-    doc.font('Helvetica').fontSize(8.5);
-    const notesHeight = invoice.notes ? doc.heightOfString(invoice.notes, { width: leftWidth }) + 24 : 0;
-    ensure(Math.max(bankHeight + notesHeight, 70));
+    ensure(Math.max(bankHeight, 70));
     const blockTop = y;
 
     if (bankRows.length) {
@@ -292,11 +299,6 @@ function renderVendorInvoicePdf({ seller, invoice }) {
         y += BANK_ROW;
       }
       y = blockTop + bankHeight + 4;
-    }
-    if (invoice.notes) {
-      sectionTitle('NOTES', MARGIN, leftWidth);
-      doc.font('Helvetica').fontSize(8.5).fillColor(TEXT).text(invoice.notes, MARGIN, y, { width: leftWidth, lineGap: 1.5 });
-      y = doc.y + 10;
     }
 
     const signY = blockTop + 4;

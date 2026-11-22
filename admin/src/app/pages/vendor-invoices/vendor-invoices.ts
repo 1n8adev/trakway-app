@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, map } from 'rxjs';
@@ -41,11 +41,22 @@ export class VendorInvoices implements OnInit {
   protected readonly PAYMENT_STATUS_BADGE = PAYMENT_STATUS_BADGE;
   protected readonly today = todayIso();
 
-  // Active vendors for the filter. Inactive ones drop out of options, but ?vendor_id still filters by them.
-  protected readonly vendors = toSignal(
-    this.invoiceService.options().pipe(map((o) => o.vendors.map((v): { id: number; name: string } => ({ id: v.id, name: v.name })))),
-    { initialValue: [] as { id: number; name: string }[] },
+  // Active vendors and invoice types for the filters. Inactive ones drop out of options, but ?vendor_id / ?type_id still filter by them.
+  private readonly filterOptions = toSignal(
+    this.invoiceService.options().pipe(
+      map((o) => ({
+        vendors: o.vendors.map((v): { id: number; name: string } => ({ id: v.id, name: v.name })),
+        types: o.types,
+      })),
+    ),
+    { initialValue: { vendors: [] as { id: number; name: string }[], types: [] as { id: number; name: string; prefix: string }[] } },
   );
+  protected readonly vendors = computed(() => this.filterOptions().vendors);
+  protected readonly types = computed(() => this.filterOptions().types);
+
+  protected get typeNotListed(): boolean {
+    return !!this.typeId && !this.types().some((t) => String(t.id) === this.typeId);
+  }
 
   protected get vendorNotListed(): boolean {
     return !!this.vendorId && !this.vendors().some((v) => String(v.id) === this.vendorId);
@@ -59,6 +70,7 @@ export class VendorInvoices implements OnInit {
   protected readonly pdfBusyId = signal<number | null>(null);
 
   protected search = '';
+  protected typeId = '';
   protected vendorId = '';
   protected paymentStatus: '' | PaymentStatus = '';
   protected status: '' | VendorInvoiceStatus = '';
@@ -76,16 +88,18 @@ export class VendorInvoices implements OnInit {
   ngOnInit(): void {
     // From the vendors page: /vendor-invoices?vendor_id=3
     this.vendorId = this.route.snapshot.queryParamMap.get('vendor_id') ?? '';
+    this.typeId = this.route.snapshot.queryParamMap.get('type_id') ?? '';
     this.load();
   }
 
   protected get hasFilters(): boolean {
-    return !!(this.search.trim() || this.vendorId || this.paymentStatus || this.status || this.from || this.to);
+    return !!(this.search.trim() || this.typeId || this.vendorId || this.paymentStatus || this.status || this.from || this.to);
   }
 
   private filters(): VendorInvoiceFilters {
     return {
       search: this.search.trim() || undefined,
+      type_id: this.typeId ? Number(this.typeId) : undefined,
       vendor_id: this.vendorId ? Number(this.vendorId) : undefined,
       payment_status: this.paymentStatus || undefined,
       status: this.status || undefined,
@@ -125,13 +139,14 @@ export class VendorInvoices implements OnInit {
 
   protected onFilterChange(): void {
     this.page = 1;
-    // Keep ?vendor_id in the URL so the filter survives a refresh / back.
-    this.router.navigate([], { queryParams: { vendor_id: this.vendorId || null }, replaceUrl: true });
+    // Keep ?vendor_id / ?type_id in the URL so the filters survive a refresh / back.
+    this.router.navigate([], { queryParams: { vendor_id: this.vendorId || null, type_id: this.typeId || null }, replaceUrl: true });
     this.load();
   }
 
   protected clearFilters(): void {
     this.search = '';
+    this.typeId = '';
     this.vendorId = '';
     this.paymentStatus = '';
     this.status = '';

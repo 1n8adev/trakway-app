@@ -14,11 +14,13 @@ function parseId(value, label = 'invoice') {
   return id;
 }
 
-// ?search=&vendor_id=&status=issued|cancelled&payment_status=unpaid|partial|paid&from=&to= (invoice date)
+// ?search=&type_id=&vendor_id=&status=issued|cancelled&payment_status=unpaid|partial|paid&from=&to= (invoice date)
 function filtersFrom(query) {
   const vendorId = Number(query.vendor_id);
+  const typeId = Number(query.type_id);
   return {
     search: query.search?.trim() || undefined,
+    typeId: Number.isInteger(typeId) && typeId > 0 ? typeId : undefined,
     vendorId: Number.isInteger(vendorId) && vendorId > 0 ? vendorId : undefined,
     status: ['issued', 'cancelled'].includes(query.status) ? query.status : undefined,
     paymentStatus: ['unpaid', 'partial', 'paid'].includes(query.payment_status) ? query.payment_status : undefined,
@@ -48,7 +50,7 @@ const getById = asyncHandler(async (req, res) => {
 
 const create = asyncHandler(async (req, res) => {
   const invoice = await vendorInvoiceService.create(req.body, req.user?.id);
-  response.created(res, invoice, `Invoice ${invoice.invoice_no} created`);
+  response.created(res, invoice, `${invoice.type_name} ${invoice.invoice_no} created`);
 });
 
 const update = asyncHandler(async (req, res) => {

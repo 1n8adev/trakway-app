@@ -28,8 +28,13 @@ import { TWO_DECIMALS, round2, rupees, signedRupees } from '../../../core/utils/
 import { FIELD_BASE, fieldState } from '../../../core/utils/ui';
 import { ConfirmDialog, ConfirmDialogData } from '../../../shared/confirm-dialog/confirm-dialog';
 
+// A line is a catalog product, a product accessory, or custom text. kind is UI-only (not sent).
+export type ItemKind = 'product' | 'accessory' | 'custom';
+
 type ItemGroup = FormGroup<{
+  kind: FormControl<ItemKind>;
   product_id: FormControl<number | null>;
+  accessory_id: FormControl<number | null>;
   description: FormControl<string>;
   hsn_sac: FormControl<string>;
   quantity: FormControl<number | null>;
@@ -56,7 +61,7 @@ const addDays = (iso: string, days: number): string => {
   return date.toISOString().slice(0, 10);
 };
 
-// Create (/vendor-invoices/new?vendor_id=) or edit (/vendor-invoices/:id/edit) a vendor GST invoice.
+// Create (/vendor-invoices/new?vendor_id=&type_id=) or edit (/vendor-invoices/:id/edit) a vendor GST invoice.
 // Totals are previewed here with the API's maths; the API recalculates and stores the real amounts.
 @Component({
   selector: 'app-invoice-form',
@@ -76,6 +81,11 @@ export class InvoiceForm {
   protected readonly limits = VENDOR_INVOICE_LIMITS;
   protected readonly rupees = rupees;
   protected readonly signedRupees = signedRupees;
+  protected readonly itemKinds: { value: ItemKind; label: string }[] = [
+    { value: 'product', label: 'Product' },
+    { value: 'accessory', label: 'Accessory' },
+    { value: 'custom', label: 'Custom' },
+  ];
 
   private readonly editId = Number(this.route.snapshot.paramMap.get('id')) || null;
   protected readonly isEdit = !!this.editId;
@@ -89,6 +99,8 @@ export class InvoiceForm {
   private saved = false;
 
   protected readonly form = this.fb.group({
+    // Asked on create; fixed afterwards (it decides the number series), so disabled when editing.
+    type_id: this.fb.control<number | null>(null, Validators.required),
     vendor_id: this.fb.control<number | null>(null, Validators.required),
     invoice_date: this.fb.nonNullable.control(todayIso(), Validators.required),
     due_date: this.fb.nonNullable.control(''),
@@ -113,6 +125,25 @@ export class InvoiceForm {
       return [{ id: inv.vendor_id, name: `${inv.bill_name} (inactive)`, contact_person: null, mobile: inv.bill_mobile, gstin: inv.bill_gstin, city: inv.bill_city, state: inv.bill_state }, ...list];
     }
     return list;
+  });
+
+  // Types to pick from on create (active ones). When editing, only the invoice's own type is shown.
+  protected readonly types = computed(() => {
+    const inv = this.invoice();
+    if (inv) return [{ id: inv.type_id, name: inv.type_name, prefix: inv.type_prefix }];
+    return this.options()?.types ?? [];
+  });
+
+  protected readonly selectedType = computed(() => this.types().find((t) => t.id === Number(this.value().type_id)) ?? null);
+
+  // Number the invoice will get, e.g. "TWR/2026-27/####" (the sequence is assigned on save).
+  protected readonly numberPreview = computed(() => {
+    const type = this.selectedType();
+    const date = this.value().invoice_date;
+    if (!type || !date) return null;
+    const [year, month] = date.split('-').map(Number);
+    const start = month >= 4 ? year : year - 1;
+    return `${type.prefix}/${start}-${String((start + 1) % 100).padStart(2, '0')}/####`;
   });
 
   protected readonly vendor = computed(() => this.vendors().find((v) => v.id === Number(this.value().vendor_id)) ?? null);
@@ -185,7 +216,11 @@ export class InvoiceForm {
   private startNew(options: VendorInvoiceOptions): void {
     const vendorId = Number(this.route.snapshot.queryParamMap.get('vendor_id'));
     const vendor = options.vendors.find((v) => v.id === vendorId);
+    // ?type_id= preselects a type; otherwise the first active type (e.g. Sales Invoice) is the default.
+    const typeId = Number(this.route.snapshot.queryParamMap.get('type_id'));
+    const type = options.types.find((t) => t.id === typeId) ?? options.types[0] ?? null;
     this.form.patchValue({
+      type_id: type?.id ?? null,
       vendor_id: vendor?.id ?? null,
       due_date: addDays(todayIso(), 15),
       terms: options.default_terms,
@@ -195,7 +230,9 @@ export class InvoiceForm {
   }
 
   private fill(inv: VendorInvoice): void {
+    this.form.controls.type_id.disable();
     this.form.patchValue({
+      type_id: inv.type_id,
       vendor_id: inv.vendor_id,
       invoice_date: inv.invoice_date,
       due_date: inv.due_date ?? '',
@@ -203,21 +240,27 @@ export class InvoiceForm {
       terms: inv.terms ?? '',
     });
     for (const item of inv.items) {
-      this.items.push(this.itemGroup({
+      const group = this.itemGroup({
+        kind: item.product_id ? 'product' : item.accessory_id ? 'accessory' : 'custom',
         product_id: item.product_id,
+        accessory_id: item.accessory_id,
         description: item.description,
         hsn_sac: item.hsn_sac ?? '',
         quantity: item.quantity,
         unit_price: item.unit_price,
         gst_rate: item.gst_rate,
-      }));
+      });
+      this.savedLines.add(group);
+      this.items.push(group);
     }
     this.form.markAsPristine();
   }
 
   private itemGroup(v: Partial<ReturnType<ItemGroup['getRawValue']>> = {}): ItemGroup {
     return this.fb.group({
+      kind: this.fb.nonNullable.control<ItemKind>(v.kind ?? 'product'),
       product_id: this.fb.control<number | null>(v.product_id ?? null),
+      accessory_id: this.fb.control<number | null>(v.accessory_id ?? null),
       description: this.fb.nonNullable.control(v.description ?? '', Validators.maxLength(VENDOR_INVOICE_LIMITS.maxDescription)),
       hsn_sac: this.fb.nonNullable.control(v.hsn_sac ?? '', hsn),
       quantity: this.fb.control<number | null>(v.quantity ?? 1, [Validators.required, amount(false)]),
@@ -236,6 +279,52 @@ export class InvoiceForm {
     this.items.markAsDirty();
   }
 
+  // Saved lines may point at a product / accessory that is inactive now (not in options).
+  protected hasProduct(id: number): boolean {
+    return (this.options()?.products ?? []).some((p) => p.id === id);
+  }
+
+  protected hasAccessory(id: number): boolean {
+    return (this.options()?.accessories ?? []).some((a) => a.id === id);
+  }
+
+  // Switching a line's kind clears the other picker; typed values (description, qty, rate...) stay.
+  // Lines loaded from a saved invoice keep their type: to change it, remove the line and add a new one.
+  private readonly savedLines = new WeakSet<ItemGroup>();
+
+  protected isSavedLine(index: number): boolean {
+    return this.savedLines.has(this.items.at(index));
+  }
+
+  protected kindLabel(kind: ItemKind): string {
+    return this.itemKinds.find((k) => k.value === kind)?.label ?? kind;
+  }
+
+  protected setKind(index: number, kind: ItemKind): void {
+    const group = this.items.at(index);
+    if (group.controls.kind.value === kind || this.savedLines.has(group)) return;
+    group.patchValue({ kind, product_id: null, accessory_id: null });
+    group.controls.product_id.setErrors(null);
+    group.controls.accessory_id.setErrors(null);
+    group.markAsDirty();
+  }
+
+  // Picking an accessory fills its name, HSN, rate (already before GST) and GST %. Everything stays editable.
+  protected onAccessory(index: number, raw: string): void {
+    const group = this.items.at(index);
+    const accessoryId = raw ? Number(raw) : null;
+    const accessory = this.options()?.accessories.find((a) => a.id === accessoryId);
+    group.controls.accessory_id.setValue(accessoryId);
+    group.controls.accessory_id.markAsTouched();
+    if (!accessory) return;
+    group.patchValue({
+      description: accessory.name,
+      hsn_sac: accessory.hsn_code,
+      unit_price: accessory.price,
+      gst_rate: accessory.gst_rate,
+    });
+  }
+
   // Picking a product fills its name, HSN and rate. The website price includes GST, so the
   // rate before GST is price / (1 + GST%). Everything stays editable.
   protected onProduct(index: number, raw: string): void {
@@ -243,6 +332,7 @@ export class InvoiceForm {
     const productId = raw ? Number(raw) : null;
     const product = this.options()?.products.find((p) => p.id === productId);
     group.controls.product_id.setValue(productId);
+    group.controls.product_id.markAsTouched();
     if (!product) return;
     const gst = group.controls.gst_rate.value;
     group.patchValue({
@@ -263,6 +353,14 @@ export class InvoiceForm {
     this.form.controls.terms.markAsDirty();
   }
 
+  protected selectType(id: number): void {
+    const control = this.form.controls.type_id;
+    if (control.disabled || control.value === id) return;
+    control.setValue(id);
+    control.markAsDirty();
+    control.markAsTouched();
+  }
+
   protected setDueIn(days: number): void {
     const date = this.form.controls.invoice_date.value || todayIso();
     this.form.controls.due_date.setValue(addDays(date, days));
@@ -273,11 +371,15 @@ export class InvoiceForm {
     const control = this.items.at(index).controls[field];
     if (!control.touched || !control.errors) return null;
     if (control.hasError('server')) return control.getError('server');
-    if (control.hasError('required')) return field === 'quantity' ? 'Enter quantity' : 'Enter rate';
+    if (control.hasError('required')) {
+      if (field === 'product_id') return 'Select a product';
+      if (field === 'accessory_id') return 'Select an accessory';
+      return field === 'quantity' ? 'Enter quantity' : 'Enter rate';
+    }
     if (control.hasError('decimals')) return 'Max 2 decimals';
     if (control.hasError('amount')) return field === 'quantity' ? 'More than 0' : '0 or more';
     if (control.hasError('hsn')) return '4–8 digits';
-    if (control.hasError('describe')) return 'Pick a product or describe the item';
+    if (control.hasError('describe')) return 'Describe the item';
     if (control.hasError('maxlength')) return 'Too long';
     return 'Invalid';
   }
@@ -286,22 +388,25 @@ export class InvoiceForm {
     return fieldState(!!this.cellError(index, field));
   }
 
-  protected fieldError(field: 'vendor_id' | 'invoice_date' | 'due_date' | 'notes' | 'terms'): string | null {
+  protected fieldError(field: 'type_id' | 'vendor_id' | 'invoice_date' | 'due_date' | 'notes' | 'terms'): string | null {
     const control = this.form.controls[field];
     if (!control.touched || !control.errors) return null;
     if (control.hasError('server')) return control.getError('server');
-    if (control.hasError('required')) return field === 'vendor_id' ? 'Select a vendor' : 'Select a date';
+    if (control.hasError('required')) {
+      return field === 'type_id' ? 'Select an invoice type' : field === 'vendor_id' ? 'Select a vendor' : 'Select a date';
+    }
     if (control.hasError('maxlength')) return `At most ${control.getError('maxlength').requiredLength} characters`;
     if (control.hasError('beforeInvoice')) return 'Due date cannot be before the invoice date';
     return 'Invalid';
   }
 
-  // Line descriptions are required only for custom lines; due date can't precede the invoice date.
+  // Product / accessory lines need their pick; custom lines need a description. Due date can't precede the invoice date.
   private validateCrossFields(): void {
     this.items.controls.forEach((group) => {
-      const desc = group.controls.description;
-      const missing = !group.controls.product_id.value && !desc.value.trim();
-      if (missing) desc.setErrors({ ...(desc.errors ?? {}), describe: true });
+      const { kind, product_id, accessory_id, description } = group.controls;
+      if (kind.value === 'product' && !product_id.value) product_id.setErrors({ required: true });
+      if (kind.value === 'accessory' && !accessory_id.value) accessory_id.setErrors({ required: true });
+      if (kind.value === 'custom' && !description.value.trim()) description.setErrors({ ...(description.errors ?? {}), describe: true });
     });
     const { invoice_date: date, due_date: due } = this.form.controls;
     if (due.value && date.value && due.value < date.value) due.setErrors({ beforeInvoice: true });
@@ -317,13 +422,15 @@ export class InvoiceForm {
 
     const v = this.form.getRawValue();
     const payload: VendorInvoicePayload = {
+      ...(this.editId ? {} : { type_id: Number(v.type_id) }),
       vendor_id: Number(v.vendor_id),
       invoice_date: v.invoice_date,
       due_date: v.due_date || null,
       notes: v.notes.trim() || null,
       terms: v.terms.trim() || null,
       items: v.items.map((item) => ({
-        product_id: item.product_id,
+        product_id: item.kind === 'product' ? item.product_id : null,
+        accessory_id: item.kind === 'accessory' ? item.accessory_id : null,
         description: item.description.trim() || null,
         hsn_sac: item.hsn_sac.trim() || null,
         quantity: item.quantity ?? 0,

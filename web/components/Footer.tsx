@@ -37,7 +37,7 @@ export default function Footer() {
             <div className="absolute inset-0 -z-10 rounded-full bg-gradient-to-br from-brand-100 to-brand-50" />
             <Image
               src="/images/app-store.png"
-              alt="Trak Way mobile app"
+              alt="Trakway mobile app"
               width={917}
               height={872}
               className="mx-auto "
@@ -53,14 +53,14 @@ export default function Footer() {
             <div className="mt-6 flex flex-wrap gap-3">
               <Image
               src="/images/google-play-store.png"
-              alt="Trak Way mobile app"
+              alt="Trakway mobile app"
               width={226}
               height={71}
               className="mx-auto"
             />
                <Image
               src="/images/apple-play-store.png"
-              alt="Trak Way mobile app"
+              alt="Trakway mobile app"
               width={220}
               height={70}
               className="mx-auto "
@@ -77,8 +77,8 @@ export default function Footer() {
           <div className="flex flex-wrap items-center justify-between gap-6 pb-6 flex-col md:flex-row">
             <Image
               src="/images/trakway-technologies.png"
-              alt="Trak Way Technologies"
-              width={858}
+              alt="Trakway Technologies"
+              width={812}
               height={205}
               className="h-16 w-auto"
             />
