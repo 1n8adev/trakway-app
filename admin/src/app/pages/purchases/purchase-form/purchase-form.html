@@ -34,7 +34,50 @@
     <a routerLink="/purchases" class="mt-2 inline-block font-medium text-brand-500 hover:underline">Back to purchases</a>
   </div>
 } @else {
-  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="space-y-5">
+  <!-- Tabs -->
+  <nav class="mb-5 flex gap-2 overflow-x-auto pb-1" aria-label="Purchase sections" role="tablist">
+    @for (tab of tabs; track tab.key; let i = $index) {
+      <button
+        type="button"
+        role="tab"
+        (click)="selectTab(tab.key)"
+        [disabled]="isLocked(tab.key)"
+        [attr.aria-selected]="activeTab() === tab.key"
+        [title]="isLocked(tab.key) ? 'Save the purchase first' : tab.label"
+        class="flex shrink-0 items-center gap-2 rounded-md px-4 py-2.5 text-[15px] font-medium whitespace-nowrap transition"
+        [class]="
+          activeTab() === tab.key
+            ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)]'
+            : isLocked(tab.key)
+              ? 'cursor-not-allowed bg-white text-gray-400 shadow-[0_1px_4px_rgba(47,43,61,0.08)]'
+              : 'bg-white text-gray-700 shadow-[0_1px_4px_rgba(47,43,61,0.08)] hover:text-brand-500'
+        "
+      >
+        <span
+          class="flex h-5 w-5 items-center justify-center rounded-full text-[12px]"
+          [class]="activeTab() === tab.key ? 'bg-white/25' : isLocked(tab.key) ? 'bg-gray-100' : 'bg-brand-100 text-brand-500'"
+        >
+          @if (isLocked(tab.key)) {
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          } @else {
+            {{ i + 1 }}
+          }
+        </span>
+        {{ tab.label }}
+        @if (tab.key === 'payments' && purchase(); as p) {
+          <span class="rounded px-1.5 text-[12px]" [class]="activeTab() === tab.key ? 'bg-white/25' : STATUS_BADGE[p.payment_status]">{{ STATUS_LABEL[p.payment_status] }}</span>
+        } @else if (tab.key === 'details' && form.dirty) {
+          <span class="h-2 w-2 rounded-full" [class]="activeTab() === tab.key ? 'bg-white' : 'bg-brand-500'" title="Unsaved changes"></span>
+        }
+      </button>
+    }
+  </nav>
+
+  <!-- Tab 1: purchase details (kept in the page while hidden, so unsaved edits survive a tab switch) -->
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="space-y-5" [hidden]="activeTab() !== 'details'">
     @if (error()) {
       <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700" role="alert">{{ error() }}</div>
     }
@@ -318,4 +361,9 @@
       <a routerLink="/purchases" class="flex h-[44px] items-center rounded-md bg-gray-100 px-6 text-[15px] font-medium text-gray-600 transition hover:bg-gray-200">Cancel</a>
     </div>
   </form>
+
+  <!-- Tab 2: payments Trakway sends the supplier (saved purchases only; saves on its own) -->
+  @if (activeTab() === 'payments' && purchase(); as p) {
+    <app-purchase-payments class="block" [purchase]="p" (changed)="purchase.set($event)" />
+  }
 }

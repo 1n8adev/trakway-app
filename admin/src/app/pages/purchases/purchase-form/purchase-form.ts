@@ -13,6 +13,7 @@ import {
   PurchaseOptions,
   PurchasePayload,
 } from '../../../core/models/purchase.model';
+import { PAYMENT_STATUS_BADGE, PAYMENT_STATUS_LABEL } from '../../../core/models/vendor-invoice.model';
 import { PurchaseService } from '../../../core/services/purchase.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { formatIsoDate, todayIso } from '../../../core/utils/date';
@@ -22,6 +23,7 @@ import { getErrorMessage, getFieldErrors } from '../../../core/utils/http-error'
 import { TWO_DECIMALS, round2, rupees, signedRupees } from '../../../core/utils/pricing';
 import { FIELD_BASE, fieldState } from '../../../core/utils/ui';
 import { ConfirmDialog, ConfirmDialogData } from '../../../shared/confirm-dialog/confirm-dialog';
+import { PurchasePayments } from '../purchase-payments/purchase-payments';
 
 type ItemGroup = FormGroup<{
   supplier_product_id: FormControl<number | null>;
@@ -29,6 +31,7 @@ type ItemGroup = FormGroup<{
   unit_price: FormControl<number | null>;
 }>;
 type ItemField = 'supplier_product_id' | 'quantity' | 'unit_price';
+type TabKey = 'details' | 'payments';
 
 // Name / HSN / GST shown for a line: from the supplier product, or the saved copy for inactive ones.
 interface LineInfo {
@@ -49,7 +52,7 @@ const amount = (allowZero: boolean) => (control: AbstractControl): ValidationErr
 // Amounts are previewed here with the same maths as the API, which calculates the saved values.
 @Component({
   selector: 'app-purchase-form',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, PurchasePayments],
   templateUrl: './purchase-form.html',
 })
 export class PurchaseForm {
@@ -66,6 +69,17 @@ export class PurchaseForm {
   protected readonly rupees = rupees;
   protected readonly signedRupees = signedRupees;
   protected readonly formatDate = formatIsoDate;
+  protected readonly STATUS_LABEL = PAYMENT_STATUS_LABEL;
+  protected readonly STATUS_BADGE = PAYMENT_STATUS_BADGE;
+
+  protected readonly tabs: { key: TabKey; label: string }[] = [
+    { key: 'details', label: 'Purchase Details' },
+    { key: 'payments', label: 'Payments to Supplier' },
+  ];
+  // ?tab=payments opens the payments tab (edit only).
+  protected readonly activeTab = signal<TabKey>(
+    this.route.snapshot.queryParamMap.get('tab') === 'payments' && this.route.snapshot.paramMap.get('id') ? 'payments' : 'details',
+  );
 
   private readonly id = Number(this.route.snapshot.paramMap.get('id')) || null;
   protected readonly isEdit = this.id !== null;
@@ -177,6 +191,17 @@ export class PurchaseForm {
       this.items.clear();
       this.addLine();
     });
+  }
+
+  // Payments need a saved purchase.
+  protected isLocked(key: TabKey): boolean {
+    return key === 'payments' && !this.purchase();
+  }
+
+  protected selectTab(key: TabKey): void {
+    if (this.isLocked(key) || key === this.activeTab()) return;
+    this.activeTab.set(key);
+    this.router.navigate([], { queryParams: { tab: key === 'payments' ? 'payments' : null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   private fill(p: Purchase): void {

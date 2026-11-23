@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
 import { Pagination } from '../../core/models/api.model';
 import { Purchase } from '../../core/models/purchase.model';
+import { PAYMENT_STATUS_BADGE, PAYMENT_STATUS_LABEL, PaymentStatus } from '../../core/models/vendor-invoice.model';
 import { Supplier } from '../../core/models/supplier.model';
 import { PurchaseService } from '../../core/services/purchase.service';
 import { SupplierService } from '../../core/services/supplier.service';
@@ -35,17 +36,22 @@ export class Purchases implements OnInit {
 
   protected readonly rupees = rupees;
   protected readonly formatDate = formatIsoDate;
+  protected readonly STATUS_LABEL = PAYMENT_STATUS_LABEL;
+  protected readonly STATUS_BADGE = PAYMENT_STATUS_BADGE;
 
   protected readonly suppliers = signal<Supplier[]>([]);
   protected readonly purchases = signal<Purchase[]>([]);
   protected readonly pagination = signal<Pagination | null>(null);
   protected readonly totalAmount = signal(0);
+  protected readonly totalPaid = signal(0);
+  protected readonly totalBalance = signal(0);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly busyId = signal<number | null>(null);
 
   protected search = '';
   protected supplierId: number | '' = '';
+  protected paymentStatus: PaymentStatus | '' = '';
   protected from = '';
   protected to = '';
   protected page = 1;
@@ -60,12 +66,14 @@ export class Purchases implements OnInit {
   ngOnInit(): void {
     const id = Number(this.route.snapshot.queryParamMap.get('supplier_id'));
     if (Number.isInteger(id) && id > 0) this.supplierId = id;
+    const status = this.route.snapshot.queryParamMap.get('payment_status');
+    if (status === 'unpaid' || status === 'partial' || status === 'paid') this.paymentStatus = status;
     this.supplierService.list({ limit: 100 }).subscribe({ next: (res) => this.suppliers.set(res.data) });
     this.load();
   }
 
   protected get hasFilters(): boolean {
-    return !!(this.search.trim() || this.supplierId || this.from || this.to);
+    return !!(this.search.trim() || this.supplierId || this.paymentStatus || this.from || this.to);
   }
 
   protected load(): void {
@@ -77,6 +85,7 @@ export class Purchases implements OnInit {
         limit: this.limit,
         search: this.search.trim() || undefined,
         supplier_id: this.supplierId || undefined,
+        payment_status: this.paymentStatus || undefined,
         from: this.from || undefined,
         to: this.to || undefined,
       })
@@ -85,6 +94,8 @@ export class Purchases implements OnInit {
           this.purchases.set(res.data);
           this.pagination.set(res.pagination);
           this.totalAmount.set(res.summary.total_amount);
+          this.totalPaid.set(res.summary.total_paid);
+          this.totalBalance.set(res.summary.total_balance);
           this.loading.set(false);
           if (!res.data.length && this.page > 1) {
             this.page--;
@@ -104,13 +115,14 @@ export class Purchases implements OnInit {
 
   protected onFilterChange(): void {
     this.page = 1;
-    this.router.navigate([], { queryParams: { supplier_id: this.supplierId || null }, replaceUrl: true });
+    this.router.navigate([], { queryParams: { supplier_id: this.supplierId || null, payment_status: this.paymentStatus || null }, replaceUrl: true });
     this.load();
   }
 
   protected clearFilters(): void {
     this.search = '';
     this.supplierId = '';
+    this.paymentStatus = '';
     this.from = '';
     this.to = '';
     this.onFilterChange();
@@ -139,6 +151,10 @@ export class Purchases implements OnInit {
   }
 
   protected confirmDelete(purchase: Purchase): void {
+    if (purchase.amount_paid > 0) {
+      this.toast.error(`${purchase.purchase_no} has payments. Delete them on the purchase page first.`);
+      return;
+    }
     this.dialog
       .open<ConfirmDialog, ConfirmDialogData, boolean>(ConfirmDialog, {
         data: {

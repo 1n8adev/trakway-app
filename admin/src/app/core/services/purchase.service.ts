@@ -3,9 +3,9 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../models/api.model';
-import { Purchase, PurchaseFilters, PurchaseOptions, PurchasePayload } from '../models/purchase.model';
+import { Purchase, PurchaseFilters, PurchaseOptions, PurchasePayload, PurchasePaymentPayload } from '../models/purchase.model';
 
-export type PurchaseList = PaginatedResponse<Purchase> & { summary: { total_amount: number } };
+export type PurchaseList = PaginatedResponse<Purchase> & { summary: { total_amount: number; total_paid: number; total_balance: number } };
 
 // /api/admin/purchases
 @Injectable({ providedIn: 'root' })
@@ -44,6 +44,19 @@ export class PurchaseService {
   // The bill is private, so it's fetched with the token as a blob.
   bill(id: number): Observable<Blob> {
     return this.http.get(`${this.baseUrl}/${id}/bill`, { responseType: 'blob' });
+  }
+
+  // Payment writes return the whole purchase (payments, amount_paid, balance, payment_status).
+  addPayment(id: number, payload: PurchasePaymentPayload): Observable<ApiResponse<Purchase>> {
+    return this.http.post<ApiResponse<Purchase>>(`${this.baseUrl}/${id}/payments`, payload);
+  }
+
+  updatePayment(id: number, paymentId: number, payload: PurchasePaymentPayload): Observable<ApiResponse<Purchase>> {
+    return this.http.put<ApiResponse<Purchase>>(`${this.baseUrl}/${id}/payments/${paymentId}`, payload);
+  }
+
+  removePayment(id: number, paymentId: number): Observable<ApiResponse<Purchase>> {
+    return this.http.delete<ApiResponse<Purchase>>(`${this.baseUrl}/${id}/payments/${paymentId}`);
   }
 
   private toFormData(p: PurchasePayload): FormData {

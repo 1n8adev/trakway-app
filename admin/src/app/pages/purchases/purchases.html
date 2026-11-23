@@ -31,6 +31,17 @@
           <option [ngValue]="s.id">{{ s.name }}{{ s.is_active ? '' : ' (inactive)' }}</option>
         }
       </select>
+      <select
+        [(ngModel)]="paymentStatus"
+        (ngModelChange)="onFilterChange()"
+        aria-label="Filter by payment status"
+        class="h-[42px] rounded-md border border-gray-300 bg-white px-3 pr-8 text-[15px] text-gray-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/15"
+      >
+        <option value="">All payments</option>
+        <option value="unpaid">Unpaid</option>
+        <option value="partial">Partially paid</option>
+        <option value="paid">Paid</option>
+      </select>
       <input
         type="date"
         [(ngModel)]="from"
@@ -67,7 +78,7 @@
         <div class="h-full w-1/3 animate-pulse bg-brand-600"></div>
       </div>
     }
-    <table class="w-full min-w-[900px] text-left">
+    <table class="w-full min-w-[1000px] text-left">
       <thead>
         <tr class="border-b border-gray-200 text-[13px] font-medium tracking-wide text-gray-800 uppercase">
           <th class="py-4 pr-4 pl-5 font-medium lg:pl-6">Purchase</th>
@@ -75,6 +86,7 @@
           <th class="px-4 py-4 font-medium">Bill date</th>
           <th class="px-4 py-4 text-right font-medium">Items</th>
           <th class="px-4 py-4 text-right font-medium">Total</th>
+          <th class="px-4 py-4 text-right font-medium">Payment</th>
           <th class="px-4 py-4 font-medium">Bill</th>
           <th class="py-4 pr-5 pl-4 text-right font-medium lg:pr-6">Actions</th>
         </tr>
@@ -83,12 +95,12 @@
         @if (loading() && !purchases().length) {
           @for (_ of [1, 2, 3, 4]; track $index) {
             <tr class="border-b border-gray-200">
-              <td colspan="7" class="px-6 py-4"><div class="h-3.5 w-full animate-pulse rounded bg-gray-100"></div></td>
+              <td colspan="8" class="px-6 py-4"><div class="h-3.5 w-full animate-pulse rounded bg-gray-100"></div></td>
             </tr>
           }
         } @else if (error()) {
           <tr>
-            <td colspan="7" class="px-6 py-14 text-center">
+            <td colspan="8" class="px-6 py-14 text-center">
               <p class="text-red-600">{{ error() }}</p>
               <button type="button" class="mt-2 font-medium text-brand-500 hover:underline" (click)="load()">Try again</button>
             </td>
@@ -112,6 +124,16 @@
               <td class="px-4 py-3 text-right whitespace-nowrap">
                 <p class="font-medium text-gray-800">{{ rupees(p.grand_total) }}</p>
                 <p class="text-[13px] text-gray-500">GST {{ rupees(p.total_tax) }}</p>
+              </td>
+              <td class="px-4 py-3 text-right whitespace-nowrap">
+                <a [routerLink]="['/purchases', p.id, 'edit']" [queryParams]="{ tab: 'payments' }" class="group block" title="Payments to supplier">
+                  <span class="rounded px-2 py-0.5 text-[12px] font-medium" [class]="STATUS_BADGE[p.payment_status]">{{ STATUS_LABEL[p.payment_status] }}</span>
+                  @if (p.balance > 0) {
+                    <span class="mt-1 block text-[13px] text-gray-500 group-hover:text-brand-500">Due {{ rupees(p.balance) }}</span>
+                  } @else {
+                    <span class="mt-1 block text-[13px] text-gray-500 group-hover:text-brand-500">Paid {{ rupees(p.amount_paid) }}</span>
+                  }
+                </a>
               </td>
               <td class="px-4 py-3">
                 @if (p.has_bill_file) {
@@ -157,7 +179,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="7" class="px-6 py-14 text-center text-gray-500">
+              <td colspan="8" class="px-6 py-14 text-center text-gray-500">
                 @if (hasFilters) {
                   No purchases match your filters.
                 } @else {
@@ -176,7 +198,7 @@
   @if (pagination(); as p) {
     @if (p.total) {
       <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-[14px] text-gray-500 lg:px-6">
-        <span>{{ p.total }} {{ p.total === 1 ? 'purchase' : 'purchases' }} · {{ rupees(totalAmount()) }}</span>
+        <span>{{ p.total }} {{ p.total === 1 ? 'purchase' : 'purchases' }} · {{ rupees(totalAmount()) }} · Paid {{ rupees(totalPaid()) }} · Due {{ rupees(totalBalance()) }}</span>
         @if (p.totalPages > 1) {
           <nav class="flex items-center gap-1.5" aria-label="Pagination">
             <button

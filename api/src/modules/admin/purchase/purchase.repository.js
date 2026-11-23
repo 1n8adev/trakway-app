@@ -2,14 +2,17 @@
 const db = require('../../../config/db');
 
 const PURCHASE_NO = "'PUR-' || LPAD(p.id::TEXT, 6, '0')";
+// Sum of the payments Trakway has sent against the bill.
+const PAID = '(SELECT COALESCE(SUM(pp.amount), 0) FROM purchase_payments pp WHERE pp.purchase_id = p.id)';
 const COLUMNS = `p.id, ${PURCHASE_NO} AS purchase_no, p.supplier_id, s.name AS supplier_name, s.gstin AS supplier_gstin,
   s.state AS supplier_state, p.bill_no, p.bill_date, p.bill_file, p.bill_file_name, p.intra_state, p.subtotal, p.cgst,
   p.sgst, p.igst, p.total_tax, p.round_off, p.grand_total, p.notes, p.created_by, a.name AS created_by_name,
-  p.created_at, p.updated_at`;
+  p.created_at, p.updated_at, ${PAID} AS amount_paid`;
 const FROM = `purchases p JOIN suppliers s ON s.id = p.supplier_id LEFT JOIN admin_users a ON a.id = p.created_by`;
 
-// Filters: search (PUR-000012, bill no, supplier name / GSTIN), supplierId, from / to (bill date).
-function whereClause({ search, supplierId, from, to }) {
+// Filters: search (PUR-000012, bill no, supplier name / GSTIN), supplierId, from / to (bill date),
+// paymentStatus (unpaid | partial | paid).
+function whereClause({ search, supplierId, from, to, paymentStatus }) {
   const conditions = [];
   const params = [];
   if (search) {
@@ -29,6 +32,9 @@ function whereClause({ search, supplierId, from, to }) {
     params.push(to);
     conditions.push(`p.bill_date <= $${params.length}`);
   }
+  if (paymentStatus === 'unpaid') conditions.push(`${PAID} = 0`);
+  if (paymentStatus === 'partial') conditions.push(`${PAID} > 0 AND ${PAID} < p.grand_total`);
+  if (paymentStatus === 'paid') conditions.push(`${PAID} > 0 AND ${PAID} >= p.grand_total`);
   return { where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }
 
@@ -46,9 +52,14 @@ async function findAll(filters, { limit, offset }) {
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset],
     ),
-    db.query(`SELECT COUNT(*)::INT AS total, COALESCE(SUM(p.grand_total), 0) AS total_amount FROM ${FROM} ${where}`, params),
+    db.query(
+      `SELECT COUNT(*)::INT AS total, COALESCE(SUM(p.grand_total), 0) AS total_amount, COALESCE(SUM(${PAID}), 0) AS total_paid
+       FROM ${FROM} ${where}`,
+      params,
+    ),
   ]);
-  return { items: list.rows, total: count.rows[0].total, totalAmount: count.rows[0].total_amount };
+  const { total, total_amount: totalAmount, total_paid: totalPaid } = count.rows[0];
+  return { items: list.rows, total, totalAmount, totalPaid };
 }
 
 async function findById(id, client = db) {
@@ -130,8 +141,12 @@ async function create(purchase, items) {
 
 // Replaces the purchase's header values and all of its lines. billFile: undefined = keep the
 // stored file, null = clear it, { key, name } = replace it.
-async function update(id, purchase, items, billFile) {
+// checkPaid(paid) runs with the purchase row locked, before anything changes (throws to stop the update).
+async function update(id, purchase, items, billFile, checkPaid = () => {}) {
   await db.withTransaction(async (client) => {
+    await client.query('SELECT id FROM purchases WHERE id = $1 FOR UPDATE', [id]);
+    const { rows: paidRows } = await client.query('SELECT COALESCE(SUM(amount), 0) AS paid FROM purchase_payments WHERE purchase_id = $1', [id]);
+    checkPaid(paidRows[0].paid);
     const keys = [...PURCHASE_WRITABLE];
     const values = keys.map((key) => purchase[key] ?? null);
     if (billFile !== undefined) {
@@ -147,8 +162,13 @@ async function update(id, purchase, items, billFile) {
   });
 }
 
+async function paymentCount(id) {
+  const { rows } = await db.query('SELECT COUNT(*)::INT AS n FROM purchase_payments WHERE purchase_id = $1', [id]);
+  return rows[0].n;
+}
+
 async function remove(id) {
   await db.query('DELETE FROM purchases WHERE id = $1', [id]);
 }
 
-module.exports = { findAll, findById, findItems, findSupplier, findSupplierProducts, billExists, options, create, update, remove };
+module.exports = { findAll, findById, findItems, findSupplier, findSupplierProducts, billExists, options, create, update, paymentCount, remove };

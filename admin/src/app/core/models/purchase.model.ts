@@ -1,4 +1,27 @@
 // /api/admin/purchases — supplier bills entered by Trakway. Prices are before GST; the API calculates amounts.
+import { PaymentMethod, PaymentStatus } from './vendor-invoice.model';
+
+// Money Trakway sent the supplier against a bill (/api/admin/purchases/:id/payments).
+export interface PurchasePayment {
+  id: number;
+  purchase_id: number;
+  paid_on: string;
+  amount: number;
+  method: PaymentMethod;
+  method_label: string;
+  reference: string | null;
+  notes: string | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export interface PurchasePaymentPayload {
+  paid_on: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string;
+  notes: string | null;
+}
 export interface PurchaseItem {
   id: number;
   supplier_product_id: number;
@@ -36,6 +59,10 @@ export interface Purchase {
   total_tax: number;
   round_off: number;
   grand_total: number;
+  // Payments to the supplier against this bill.
+  amount_paid: number;
+  balance: number;
+  payment_status: PaymentStatus;
   notes: string | null;
   created_by_name: string | null;
   created_at: string;
@@ -45,6 +72,7 @@ export interface Purchase {
   total_quantity?: number;
   // GET /:id only.
   items?: PurchaseItem[];
+  payments?: PurchasePayment[];
 }
 
 export interface PurchaseFilters {
@@ -54,6 +82,7 @@ export interface PurchaseFilters {
   supplier_id?: number;
   from?: string;
   to?: string;
+  payment_status?: PaymentStatus;
 }
 
 export interface PurchaseOptionSupplier {
@@ -96,5 +125,5 @@ export interface PurchasePayload {
 }
 
 // Same limits as the API's purchase.validation.js / upload middleware.
-export const PURCHASE_LIMITS = { maxBillNo: 50, maxNotes: 1000, maxItems: 100, maxFileMb: 10 } as const;
+export const PURCHASE_LIMITS = { maxBillNo: 50, maxNotes: 1000, maxItems: 100, maxFileMb: 10, maxReference: 100, maxPaymentNotes: 1000 } as const;
 export const BILL_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];

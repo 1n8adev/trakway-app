@@ -5,13 +5,18 @@ const ApiError = require('../../../utils/ApiError');
 const { privateFilePath, removePrivateFile } = require('../../../utils/file');
 const purchaseRepository = require('./purchase.repository');
 const { calculate } = require('../vendor-invoice/vendor-invoice.service');
+const { formatInr } = require('../../../utils/money');
+const paymentService = require('./purchase-payment.service');
+const paymentRepository = require('./purchase-payment.repository');
 
 const BILL_TAKEN = 'This bill number is already entered for this supplier';
 
 // The storage key is never sent to the client; bill_file_url is the authenticated download route.
+// Adds balance and payment_status (unpaid | partial | paid) from amount_paid.
 function format({ bill_file: billFile, ...purchase }) {
   return {
     ...purchase,
+    ...paymentService.paymentSummary(purchase.grand_total, purchase.amount_paid),
     has_bill_file: Boolean(billFile),
     bill_file_url: billFile ? `/api/admin/purchases/${purchase.id}/bill` : null,
   };
@@ -25,7 +30,8 @@ async function findOrFail(id) {
 
 async function getById(id) {
   const purchase = await findOrFail(id);
-  return { ...format(purchase), items: await purchaseRepository.findItems(id) };
+  const [items, payments] = await Promise.all([purchaseRepository.findItems(id), paymentRepository.findByPurchase(id)]);
+  return { ...format(purchase), items, payments: payments.map(paymentService.format) };
 }
 
 async function list(filters, pagination) {
@@ -105,7 +111,12 @@ async function update(id, body) {
   if (body.bill_file) billFile = { key: body.bill_file, name: body.bill_file_name };
   else if (body.remove_bill_file) billFile = null;
   try {
-    await purchaseRepository.update(id, purchase, lines, billFile);
+    await purchaseRepository.update(id, purchase, lines, billFile, (paid) => {
+      if (paid > purchase.grand_total) {
+        const msg = `The new total (${formatInr(purchase.grand_total)}) is less than the ${formatInr(paid)} already paid. Remove a payment first.`;
+        throw ApiError.conflict(msg);
+      }
+    });
   } catch (err) {
     throw uniqueError(err);
   }
@@ -115,6 +126,7 @@ async function update(id, body) {
 
 async function remove(id) {
   const purchase = await findOrFail(id);
+  if (await purchaseRepository.paymentCount(id)) throw ApiError.conflict('This purchase has payments. Delete them before deleting the purchase.');
   await purchaseRepository.remove(id);
   if (purchase.bill_file) removePrivateFile(purchase.bill_file);
 }

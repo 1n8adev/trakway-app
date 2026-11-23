@@ -302,4 +302,5 @@ module.exports = {
   getPdf,
   calculate,
   financialYear,
+  methodLabel,
 };

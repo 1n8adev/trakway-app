@@ -1,0 +1,194 @@
+@let p = purchase();
+<section class="overflow-hidden rounded-md bg-white shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+  <!-- Header + summary -->
+  <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 lg:px-6">
+    <div class="flex items-center gap-3">
+      <h2 class="text-[17px] font-semibold text-gray-800">Payments to supplier</h2>
+      <span class="rounded px-2.5 py-1 text-[13px] font-medium" [class]="STATUS_BADGE[p.payment_status]">{{ STATUS_LABEL[p.payment_status] }}</span>
+    </div>
+    <span class="text-[14px] text-gray-500">Money Trakway sent {{ p.supplier_name }} against bill {{ p.bill_no }}</span>
+  </div>
+
+  <dl class="grid grid-cols-1 gap-3 border-t border-gray-200 px-5 py-4 text-center sm:grid-cols-3 lg:px-6">
+    <div class="rounded-md bg-gray-50 px-3 py-3">
+      <dt class="text-[12px] text-gray-600">Bill total</dt>
+      <dd class="text-[17px] font-semibold text-gray-800">{{ rupees(p.grand_total) }}</dd>
+    </div>
+    <div class="rounded-md bg-green-50 px-3 py-3">
+      <dt class="text-[12px] text-green-700">Paid</dt>
+      <dd class="text-[17px] font-semibold text-green-700">{{ rupees(p.amount_paid) }}</dd>
+    </div>
+    <div class="rounded-md px-3 py-3" [class]="p.balance > 0 ? 'bg-brand-100/50' : 'bg-gray-50'">
+      <dt class="text-[12px] text-gray-600">Balance to pay</dt>
+      <dd class="text-[17px] font-semibold" [class]="p.balance > 0 ? 'text-brand-600' : 'text-gray-500'">{{ rupees(p.balance) }}</dd>
+    </div>
+  </dl>
+
+  <!-- Record / edit payment -->
+  <div class="border-t border-gray-200 px-5 py-5 lg:px-6">
+    @if (showForm()) {
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <h3 class="mb-3 text-[15px] font-medium text-gray-800">
+          {{ editing() ? 'Edit payment' : 'Record payment' }}
+        </h3>
+        @if (error()) {
+          <div class="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700" role="alert">{{ error() }}</div>
+        }
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <label for="pp-date" class="mb-1.5 block text-[14px] text-gray-700">Paid on <span class="text-red-500">*</span></label>
+            <input
+              id="pp-date"
+              type="date"
+              formControlName="paid_on"
+              [max]="today"
+              class="h-[42px] px-3"
+              [class]="FIELD_BASE + ' ' + fieldState(!!fieldError('paid_on'))"
+            />
+            @if (fieldError('paid_on'); as msg) {
+              <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+            }
+          </div>
+          <div>
+            <label for="pp-amount" class="mb-1.5 block text-[14px] text-gray-700">Amount (₹) <span class="text-red-500">*</span></label>
+            <input
+              id="pp-amount"
+              type="number"
+              formControlName="amount"
+              min="0.01"
+              step="any"
+              class="h-[42px] px-3"
+              [class]="FIELD_BASE + ' ' + fieldState(!!fieldError('amount'))"
+            />
+            @if (fieldError('amount'); as msg) {
+              <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+            } @else {
+              <p class="mt-1 text-[12px] text-gray-400">Up to {{ rupees(maxAmount()) }}</p>
+            }
+          </div>
+          <div>
+            <label for="pp-method" class="mb-1.5 block text-[14px] text-gray-700">Method</label>
+            <select id="pp-method" formControlName="method" class="h-[42px] px-3" [class]="FIELD_BASE + ' ' + fieldState(false)">
+              @for (m of methods; track m.value) {
+                <option [value]="m.value">{{ m.label }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label for="pp-ref" class="mb-1.5 block text-[14px] text-gray-700">Reference <span class="text-red-500">*</span> <span class="text-[12px] text-gray-400">(UTR / cheque no)</span></label>
+            <input
+              id="pp-ref"
+              type="text"
+              formControlName="reference"
+              [maxlength]="limits.maxReference"
+              class="h-[42px] px-3"
+              [class]="FIELD_BASE + ' ' + fieldState(!!fieldError('reference'))"
+            />
+            @if (fieldError('reference'); as msg) {
+              <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+            }
+          </div>
+          <div class="sm:col-span-2 xl:col-span-4">
+            <label for="pp-notes" class="mb-1.5 block text-[14px] text-gray-700">Notes <span class="text-[12px] text-gray-400">(optional)</span></label>
+            <input
+              id="pp-notes"
+              type="text"
+              formControlName="notes"
+              [maxlength]="limits.maxPaymentNotes"
+              placeholder="e.g. Advance paid, paid from HDFC current account"
+              class="h-[42px] px-3"
+              [class]="FIELD_BASE + ' ' + fieldState(!!fieldError('notes'))"
+            />
+            @if (fieldError('notes'); as msg) {
+              <p class="mt-1 text-[12px] text-red-600">{{ msg }}</p>
+            }
+          </div>
+        </div>
+        <div class="mt-4 flex items-center gap-3">
+          <button
+            type="submit"
+            [disabled]="saving()"
+            class="flex h-[42px] items-center justify-center gap-2 rounded-md bg-gradient-to-r from-brand-600 to-brand-500 px-6 text-[15px] font-medium text-white shadow-[0_2px_6px_rgba(231,95,0,0.35)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {{ saving() ? 'Saving…' : editing() ? 'Save payment' : 'Record payment' }}
+          </button>
+          @if (editing()) {
+            <button type="button" (click)="cancelEdit()" [disabled]="saving()" class="h-[42px] rounded-md bg-gray-100 px-5 text-[15px] font-medium text-gray-600 transition hover:bg-gray-200">
+              Cancel
+            </button>
+          }
+        </div>
+      </form>
+    } @else {
+      <div class="flex items-start gap-3 rounded-md bg-green-50 px-4 py-3 text-[14px] text-green-800">
+        <svg class="mt-0.5 h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+        <p><span class="font-medium">Fully paid</span>: nothing is left to pay on this bill. To correct a payment, edit it below.</p>
+      </div>
+    }
+  </div>
+
+  <!-- History -->
+  @if (payments().length) {
+    <div class="overflow-x-auto border-t border-gray-200">
+      <table class="w-full min-w-[720px] text-left text-[15px]">
+        <thead>
+          <tr class="border-b border-gray-200 text-[12px] font-medium tracking-wide text-gray-600 uppercase">
+            <th class="py-3 pl-5 font-medium lg:pl-6">Paid on</th>
+            <th class="px-3 py-3 font-medium">Method</th>
+            <th class="px-3 py-3 font-medium">Reference</th>
+            <th class="px-3 py-3 text-right font-medium">Amount</th>
+            <th class="px-3 py-3 text-right font-medium">Balance after</th>
+            <th class="w-24 py-3 pr-5 lg:pr-6"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (pay of payments(); track pay.id; let i = $index) {
+            <tr class="border-b border-gray-100" [class.opacity-50]="removingId() === pay.id" [class.bg-brand-100/30]="editing()?.id === pay.id">
+              <td class="py-3 pl-5 whitespace-nowrap text-gray-800 lg:pl-6">
+                {{ formatDate(pay.paid_on) }}
+                @if (pay.created_by_name) {
+                  <span class="block text-[12px] text-gray-400">by {{ pay.created_by_name }}</span>
+                }
+              </td>
+              <td class="px-3 py-3 text-gray-700">{{ pay.method_label }}</td>
+              <td class="px-3 py-3">
+                <span class="font-mono text-[13px] text-gray-600">{{ pay.reference || '—' }}</span>
+                @if (pay.notes) {
+                  <span class="block text-[12px] text-gray-500">{{ pay.notes }}</span>
+                }
+              </td>
+              <td class="px-3 py-3 text-right font-medium whitespace-nowrap text-green-700">{{ rupees(pay.amount) }}</td>
+              <td class="px-3 py-3 text-right whitespace-nowrap text-gray-600">{{ rupees(balanceAfter(i)) }}</td>
+              <td class="py-3 pr-5 text-right whitespace-nowrap lg:pr-6">
+                <button
+                  type="button"
+                  (click)="edit(pay)"
+                  class="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-brand-500"
+                  [attr.aria-label]="'Edit payment of ' + rupees(pay.amount)"
+                  title="Edit payment"
+                >
+                  <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20.385 6.585a2.1 2.1 0 0 0-2.97-2.97L9 12v3h3l8.385-8.415Z" />
+                    <path d="m16 5 3 3" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  (click)="remove(pay)"
+                  [disabled]="removingId() === pay.id"
+                  class="rounded-full p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-500"
+                  [attr.aria-label]="'Delete payment of ' + rupees(pay.amount)"
+                  title="Delete payment"
+                >
+                  <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="border-t border-gray-200 px-5 py-6 text-center text-[14px] text-gray-500 lg:px-6">No payments recorded yet.</p>
+  }
+</section>

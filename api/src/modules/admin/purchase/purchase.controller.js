@@ -5,7 +5,10 @@ const response = require('../../../utils/response');
 const { getPagination } = require('../../../utils/pagination');
 const purchaseService = require('./purchase.service');
 
+const { round2 } = require('../../../utils/money');
+
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid'];
 const FIELDS = ['supplier_id', 'bill_no', 'bill_date', 'notes', 'items', 'bill_file', 'bill_file_name', 'remove_bill_file'];
 
 function parseId(value, label = 'purchase') {
@@ -20,15 +23,17 @@ const options = asyncHandler(async (req, res) => {
   response.success(res, await purchaseService.options());
 });
 
-// ?search=&supplier_id=&from=&to=&page=&limit= — meta adds total_amount of all matching purchases.
+// ?search=&supplier_id=&from=&to=&payment_status=&page=&limit= — summary adds total_amount / total_paid / total_balance
+// of all matching purchases.
 const list = asyncHandler(async (req, res) => {
   const pagination = getPagination(req.query);
-  const { search, supplier_id: supplierId, from, to } = req.query;
-  const { items, total, totalAmount } = await purchaseService.list({
+  const { search, supplier_id: supplierId, from, to, payment_status: paymentStatus } = req.query;
+  const { items, total, totalAmount, totalPaid } = await purchaseService.list({
     search: search?.trim() || undefined,
     supplierId: supplierId ? parseId(supplierId, 'supplier') : undefined,
     from: DATE_REGEX.test(from || '') ? from : undefined,
     to: DATE_REGEX.test(to || '') ? to : undefined,
+    paymentStatus: PAYMENT_STATUSES.includes(paymentStatus) ? paymentStatus : undefined,
   }, pagination);
   res.status(200).json({
     success: true,
@@ -36,7 +41,7 @@ const list = asyncHandler(async (req, res) => {
     message: 'Success',
     data: items,
     pagination: { page: pagination.page, limit: pagination.limit, total, totalPages: Math.ceil(total / pagination.limit) },
-    summary: { total_amount: totalAmount },
+    summary: { total_amount: totalAmount, total_paid: totalPaid, total_balance: round2(totalAmount - totalPaid) },
   });
 });
 
