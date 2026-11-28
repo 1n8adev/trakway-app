@@ -12,7 +12,7 @@
         <span class="rounded px-2.5 py-1 text-[13px] font-medium" [class]="PAYMENT_BADGE[o.payment_status]">Payment {{ PAYMENT_LABEL[o.payment_status].toLowerCase() }}</span>
       </div>
       <p class="text-[14px] text-gray-500">
-        Placed {{ o.created_at | date: 'd MMM y, h:mm a' }} · {{ o.items_count }} {{ o.items_count === 1 ? 'item' : 'items' }} · Cash on Delivery
+        Placed {{ o.created_at | date: 'd MMM y, h:mm a' }} · {{ o.items_count }} {{ o.items_count === 1 ? 'item' : 'items' }} · {{ METHOD_LABEL[o.payment_method] }}
       </p>
     } @else {
       <h1 class="text-[22px] font-semibold text-gray-800">Order</h1>
@@ -184,13 +184,26 @@
             <p class="text-right text-[13px] text-gray-500">MRP {{ rupees(o.mrp_total) }} · product offers saved {{ rupees(saved()) }}</p>
           }
           <p class="text-right text-[13px] text-gray-500">
-            Cash on Delivery ·
-            @if (o.payment_status === 'paid') {
-              collected
-            } @else if (o.payment_status === 'pending') {
-              collect {{ rupees(o.total) }} on delivery
+            @if (o.payment_method === 'razorpay') {
+              Online (Razorpay) ·
+              @if (o.payment_status === 'paid') {
+                paid{{ o.paid_at ? ' ' + (o.paid_at | date: 'd MMM y, h:mm a') : '' }}
+              } @else if (o.payment_status === 'refunded') {
+                refunded
+              } @else if (o.payment_status === 'pending') {
+                waiting for payment
+              } @else {
+                not paid
+              }
             } @else {
-              not collected
+              Cash on Delivery ·
+              @if (o.payment_status === 'paid') {
+                collected
+              } @else if (o.payment_status === 'pending') {
+                collect {{ rupees(o.total) }} on delivery
+              } @else {
+                not collected
+              }
             }
           </p>
         </dl>
@@ -218,6 +231,69 @@
           }
         </ol>
       </section>
+
+      <!-- Online payments (Razorpay) -->
+      @if (o.payment_method === 'razorpay') {
+        <section class="rounded-md bg-white px-6 py-5 shadow-[0_2px_8px_rgba(47,43,61,0.12)]">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-[16px] font-semibold text-gray-800">Online Payment</h2>
+            <div class="flex flex-wrap gap-2">
+              @if (o.can_refund) {
+                <button
+                  type="button"
+                  (click)="refund()"
+                  [disabled]="paymentBusy() !== null"
+                  class="h-[36px] rounded-md bg-red-600 px-3 text-[14px] font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  {{ paymentBusy() === 'refund' ? 'Refunding…' : 'Refund ' + rupees(o.total) }}
+                </button>
+              }
+              <button
+                type="button"
+                (click)="syncPayment()"
+                [disabled]="paymentBusy() !== null"
+                class="h-[36px] rounded-md border border-gray-300 bg-white px-3 text-[14px] font-medium text-gray-700 hover:border-brand-600 hover:text-brand-600 disabled:opacity-60"
+              >
+                {{ paymentBusy() === 'sync' ? 'Checking…' : 'Check with Razorpay' }}
+              </button>
+            </div>
+          </div>
+          @if (o.razorpay_order_id) {
+            <p class="mb-3 text-[13px] text-gray-500">Razorpay order <span class="font-mono text-gray-700">{{ o.razorpay_order_id }}</span></p>
+          }
+          @if (o.payments?.length) {
+            <ul class="divide-y divide-gray-100">
+              @for (p of o.payments; track p.id) {
+                <li class="py-3 text-[14px] first:pt-0 last:pb-0">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="font-mono text-[13px] text-gray-700">{{ p.razorpay_payment_id }}</span>
+                    <span
+                      class="rounded px-2 py-0.5 text-[12px] font-medium"
+                      [class]="p.status === 'captured' ? 'bg-green-50 text-green-700' : p.status === 'failed' ? 'bg-red-50 text-red-600' : p.status === 'refunded' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'"
+                    >{{ p.status }}</span>
+                  </div>
+                  <p class="mt-1 text-gray-600">{{ rupees(p.amount) }} · {{ paymentDetail(p) }}</p>
+                  <p class="text-[13px] text-gray-500">
+                    {{ p.created_at | date: 'd MMM y, h:mm a' }}
+                    @if (p.signature_verified) { · signature verified }
+                    @if (p.details.acquirer_rrn) { · RRN {{ p.details.acquirer_rrn }} }
+                  </p>
+                  @if (p.error_description) {
+                    <p class="text-[13px] text-red-600">{{ p.error_description }}</p>
+                  }
+                  @if (p.refund_id) {
+                    <p class="text-[13px] text-sky-700">
+                      Refund {{ rupees(p.refund_amount ?? p.amount) }} · {{ p.refund_status }} · <span class="font-mono">{{ p.refund_id }}</span>
+                    </p>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="text-[14px] text-gray-500">No payment attempts yet.</p>
+          }
+        </section>
+      }
     </div>
 
     <!-- Right: customer, address, notes -->

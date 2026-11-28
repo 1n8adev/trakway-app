@@ -1,4 +1,5 @@
 const env = require('../config/env');
+const ApiError = require('../utils/ApiError');
 const { removeUploadedFile, removePrivateFile } = require('../utils/file');
 
 // PostgreSQL error codes mapped to HTTP responses.
@@ -26,7 +27,8 @@ module.exports = (err, req, res, next) => {
 
   if (statusCode >= 500) {
     console.error(err);
-    if (env.nodeEnv === 'production') message = 'Internal server error';
+    // ApiError messages are written for customers (e.g. "Could not send the email"); hide anything else.
+    if (env.nodeEnv === 'production' && !(err instanceof ApiError)) message = 'Internal server error';
   }
 
   res.status(statusCode).json({

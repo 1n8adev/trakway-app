@@ -62,7 +62,7 @@ export class AdminLayout implements OnInit {
       heading: 'Vendors',
       items: [
         { label: 'Vendors', path: '/vendors', icon: 'vendors' },
-        { label: 'Vendor Invoices All', path: '/vendor-invoices', icon: 'invoices' },
+        { label: 'Vendor Invoices', path: '/vendor-invoices', icon: 'invoices' },
       ],
     },
     {

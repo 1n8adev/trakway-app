@@ -21,7 +21,12 @@ export interface CancelOrderData {
       </div>
       <h2 class="text-center text-[22px] font-semibold text-gray-800">Cancel {{ data.order.order_no }}?</h2>
       <p class="mt-2 text-center text-[15px] leading-relaxed text-gray-500">
-        The order can't be reopened after this. Its payment is marked cancelled{{ data.order.coupon_code ? ' and its use of coupon ' + data.order.coupon_code + ' is freed' : '' }}.
+        The order can't be reopened after this.
+        @if (data.order.payment_method === 'razorpay' && data.order.payment_status === 'paid') {
+          The customer's online payment is <strong class="text-gray-700">refunded in full</strong> through Razorpay
+        } @else {
+          Its payment is marked cancelled
+        }{{ data.order.coupon_code ? ' and its use of coupon ' + data.order.coupon_code + ' is freed' : '' }}.
       </p>
 
       <label for="cancel-reason" class="mt-6 mb-2 block text-[15px] text-gray-700">

@@ -2,6 +2,7 @@ const express = require('express');
 const { checkConnection } = require('../config/db');
 const adminRoutes = require('../modules/admin/admin.routes');
 const websiteRoutes = require('../modules/website/website.routes');
+const paymentRoutes = require('../modules/payment/payment.routes');
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.get('/health', async (req, res) => {
 });
 
 router.use('/admin', adminRoutes);
+router.use('/payments', paymentRoutes);
 router.use('/', websiteRoutes);
 
 module.exports = router;

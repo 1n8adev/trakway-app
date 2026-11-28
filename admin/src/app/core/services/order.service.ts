@@ -38,6 +38,16 @@ export class OrderService {
     return this.http.patch<ApiResponse<Order>>(`${this.baseUrl}/${id}/status`, payload);
   }
 
+  // Re-reads the order's Razorpay payments (missed webhook / customer says they paid).
+  syncPayment(id: number): Observable<ApiResponse<Order>> {
+    return this.http.post<ApiResponse<Order>>(`${this.baseUrl}/${id}/sync-payment`, {});
+  }
+
+  // Full refund of a cancelled order that is still marked paid (retry after a failed refund).
+  refund(id: number): Observable<ApiResponse<Order>> {
+    return this.http.post<ApiResponse<Order>>(`${this.baseUrl}/${id}/refund`, {});
+  }
+
   // null / "" clears the notes.
   updateNotes(id: number, adminNotes: string | null): Observable<ApiResponse<Order>> {
     return this.http.patch<ApiResponse<Order>>(`${this.baseUrl}/${id}`, { admin_notes: adminNotes });

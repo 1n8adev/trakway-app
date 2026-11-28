@@ -11,8 +11,23 @@ const summary = asyncHandler(async (req, res) => {
 
 const place = asyncHandler(async (req, res) => {
   const fields = ['address_id', 'billing_address_id', 'billing_company_name', 'billing_gstin', 'coupon_code', 'note'];
-  const order = await orderService.place(req.customer, Object.fromEntries(fields.map((key) => [key, req.body[key]])));
-  response.created(res, order, `Order ${order.order_no} placed successfully`);
+  const input = Object.fromEntries(fields.map((key) => [key, req.body[key]]));
+  input.payment_method = req.body.payment_method || 'razorpay';
+  const order = await orderService.place(req.customer, input);
+  response.created(res, order, order.razorpay ? `Order ${order.order_no} created. Complete the payment to place it.`
+    : `Order ${order.order_no} placed successfully`);
+});
+
+// Razorpay Checkout options to (re)try paying an order that is waiting for payment.
+const pay = asyncHandler(async (req, res) => {
+  response.success(res, await orderService.pay(req.customer, req.params.orderNo));
+});
+
+const verifyPayment = asyncHandler(async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const order = await orderService.verifyPayment(req.customer, req.params.orderNo,
+    { razorpay_order_id, razorpay_payment_id, razorpay_signature });
+  response.success(res, order, `Payment received. Order ${order.order_no} placed successfully`);
 });
 
 const list = asyncHandler(async (req, res) => {
@@ -36,4 +51,4 @@ const invoice = asyncHandler(async (req, res) => {
   invoiceService.sendPdf(res, await invoiceService.getInvoicePdf(order.id));
 });
 
-module.exports = { summary, place, list, get, cancel, invoice };
+module.exports = { summary, place, pay, verifyPayment, list, get, cancel, invoice };

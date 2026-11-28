@@ -1,5 +1,39 @@
-export type OrderStatus = 'placed' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
-export type PaymentStatus = 'pending' | 'paid' | 'cancelled';
+// pending_payment = online (Razorpay) order not paid yet; it becomes placed when the payment is verified.
+export type OrderStatus = 'pending_payment' | 'placed' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+export type PaymentMethod = 'cod' | 'razorpay';
+
+// One Razorpay payment attempt (failed ones too), as last reported by Razorpay.
+export interface OrderPayment {
+  id: number;
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  amount: number;
+  currency: string;
+  status: 'created' | 'authorized' | 'captured' | 'failed' | 'refunded' | string;
+  method: string | null;
+  details: {
+    email?: string;
+    contact?: string;
+    vpa?: string;
+    bank?: string;
+    wallet?: string;
+    card_network?: string;
+    card_last4?: string;
+    card_type?: string;
+    acquirer_rrn?: string;
+    upi_transaction_id?: string;
+  };
+  error_code: string | null;
+  error_description: string | null;
+  signature_verified: boolean;
+  captured_at: string | null;
+  refund_id: string | null;
+  refund_amount: number | null;
+  refund_status: 'pending' | 'processed' | 'failed' | string | null;
+  refunded_at: string | null;
+  created_at: string;
+}
 
 export interface OrderCustomer {
   id: number;
@@ -29,8 +63,10 @@ export interface Order {
   // "ORD-000012"
   order_no: string;
   status: OrderStatus;
-  payment_method: 'cod';
+  payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+  razorpay_order_id: string | null;
+  paid_at: string | null;
   subtotal: number;
   mrp_total: number;
   coupon_id: number | null;
@@ -74,6 +110,11 @@ export interface Order {
   next_statuses: OrderStatus[];
   // GET /:id only.
   items?: OrderItem[];
+  payments?: OrderPayment[];
+  // Cancelled + still paid online: the refund can be (re)started.
+  can_refund?: boolean;
+  // Set when a cancel succeeded but the Razorpay refund failed.
+  refund_error?: string;
 }
 
 export interface OrderFilters {
@@ -102,7 +143,13 @@ export const ORDER_LIMITS = {
   maxCancelReason: 255,
 } as const;
 
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  cod: 'Cash on Delivery',
+  razorpay: 'Online (Razorpay)',
+};
+
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  pending_payment: 'Payment Pending',
   placed: 'Placed',
   confirmed: 'Confirmed',
   shipped: 'Shipped',
@@ -112,6 +159,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 
 // Placed = waiting for the admin (orange).
 export const ORDER_STATUS_BADGE: Record<OrderStatus, string> = {
+  pending_payment: 'bg-amber-50 text-amber-700',
   placed: 'bg-brand-100 text-brand-600',
   confirmed: 'bg-sky-50 text-sky-700',
   shipped: 'bg-violet-50 text-violet-700',
@@ -122,17 +170,22 @@ export const ORDER_STATUS_BADGE: Record<OrderStatus, string> = {
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
   pending: 'Pending',
   paid: 'Paid',
+  failed: 'Failed',
   cancelled: 'Cancelled',
+  refunded: 'Refunded',
 };
 
 export const PAYMENT_STATUS_BADGE: Record<PaymentStatus, string> = {
   pending: 'bg-amber-50 text-amber-700',
   paid: 'bg-green-50 text-green-700',
+  failed: 'bg-red-50 text-red-600',
   cancelled: 'bg-gray-100 text-gray-500',
+  refunded: 'bg-sky-50 text-sky-700',
 };
 
 // Button text for moving to a status.
 export const ORDER_ACTION_LABEL: Record<OrderStatus, string> = {
+  pending_payment: 'Payment Pending',
   placed: 'Placed',
   confirmed: 'Confirm Order',
   shipped: 'Mark as Shipped',

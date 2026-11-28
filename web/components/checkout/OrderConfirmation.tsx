@@ -55,7 +55,9 @@ export default function OrderConfirmation({ orderNo }: { orderNo: string | null 
           been received. A confirmation has been sent to your email.
         </p>
         <p className="mt-4 inline-block rounded-full bg-brand-50 px-5 py-2 text-sm font-semibold text-brand-700">
-          Pay {formatPrice(order.total)} in cash on delivery
+          {order.payment_method === 'razorpay'
+            ? `${formatPrice(order.total)} paid online`
+            : `Pay ${formatPrice(order.total)} in cash on delivery`}
         </p>
       </div>
 
@@ -101,7 +103,7 @@ export default function OrderConfirmation({ orderNo }: { orderNo: string | null 
               <dd className="font-semibold text-green-600">{order.shipping_fee > 0 ? formatPrice(order.shipping_fee) : 'Free'}</dd>
             </div>
             <div className="flex justify-between gap-4 border-t border-gray-200 pt-2">
-              <dt className="font-semibold text-gray-900">Total (Cash on Delivery)</dt>
+              <dt className="font-semibold text-gray-900">Total ({order.payment_method === 'razorpay' ? 'Paid online' : 'Cash on Delivery'})</dt>
               <dd className="font-bold text-gray-900">{formatPrice(order.total)}</dd>
             </div>
           </dl>

@@ -59,9 +59,18 @@ const update = asyncHandler(async (req, res) => {
   response.success(res, await orderService.updateNotes(parseId(req.params.id), req.body.admin_notes), 'Order updated');
 });
 
+const refund = asyncHandler(async (req, res) => {
+  response.success(res, await orderService.refund(parseId(req.params.id)), 'Refund started');
+});
+
+const syncPayment = asyncHandler(async (req, res) => {
+  const order = await orderService.syncPayment(parseId(req.params.id));
+  response.success(res, order, `Payment status: ${order.payment_status}`);
+});
+
 // PDF tax invoice for any order (not cancelled ones).
 const invoice = asyncHandler(async (req, res) => {
   invoiceService.sendPdf(res, await invoiceService.getInvoicePdf(parseId(req.params.id)));
 });
 
-module.exports = { list, summary, getById, setStatus, update, invoice };
+module.exports = { list, summary, getById, setStatus, update, invoice, refund, syncPayment };

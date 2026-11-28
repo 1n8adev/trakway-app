@@ -1,9 +1,10 @@
-// Checkout (Cash on Delivery) and customer orders. Browser-only; needs a
+// Checkout (Cash on Delivery or Razorpay) and customer orders. Browser-only; needs a
 // logged-in customer. Mirrors TrakwayAPI's modules/website/order.
 
 import { authDownload, authRequest, authRequestPage, type Paginated } from './auth';
 import { toCart, type Cart, type RawCart } from './cart';
 import { toAssetUrl } from './products';
+import type { RazorpayCheckoutOptions, RazorpaySuccess } from './razorpay';
 
 const PUBLIC_API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/$/, '');
 
@@ -17,10 +18,13 @@ export type CheckoutTotals = {
   total: number;
 };
 
-export type CheckoutSummary = Cart & { coupon: AppliedCoupon | null; totals: CheckoutTotals };
+export type PaymentMethod = 'cod' | 'razorpay';
+
+export type CheckoutSummary = Cart & { coupon: AppliedCoupon | null; totals: CheckoutTotals; paymentMethods: PaymentMethod[] };
 
 type RawCheckoutSummary = RawCart & {
   coupon: AppliedCoupon | null;
+  payment_methods?: PaymentMethod[];
   totals: { mrp_total: number; subtotal: number; coupon_discount: number; shipping_fee: number; total: number };
 };
 
@@ -39,7 +43,8 @@ export async function fetchCheckoutSummary(couponCode?: string | null): Promise<
       couponDiscount: raw.totals.coupon_discount,
       shippingFee: raw.totals.shipping_fee,
       total: raw.totals.total
-    }
+    },
+    paymentMethods: raw.payment_methods ?? []
   };
 }
 
@@ -57,15 +62,31 @@ export type OrderItem = {
   line_total: number;
 };
 
-export type OrderStatus = 'placed' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
-export type PaymentStatus = 'pending' | 'paid' | 'cancelled';
+export type OrderStatus = 'pending_payment' | 'placed' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+
+// Online orders: the successful (or latest) Razorpay payment attempt.
+export type OrderPayment = {
+  razorpay_payment_id: string;
+  status: string;
+  method: string | null;
+  amount: number;
+  error_description: string | null;
+  refund_status: string | null;
+  refund_amount: number | null;
+  refunded_at: string | null;
+};
 
 export type Order = {
   id: number;
   order_no: string;
   status: OrderStatus;
-  payment_method: string;
+  payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+  payment: OrderPayment | null;
+  paid_at: string | null;
+  // Set by cancel when the order was cancelled but its refund could not be started.
+  refund_error?: string;
   subtotal: number;
   mrp_total: number;
   coupon_code: string | null;
@@ -116,7 +137,12 @@ export type OrderListItem = {
 
 // Customers can cancel online only until the order is confirmed.
 export function canCancelOrder(order: { status: OrderStatus }) {
-  return order.status === 'placed';
+  return order.status === 'placed' || order.status === 'pending_payment';
+}
+
+// An online order still waiting for its payment.
+export function canPayOrder(order: { status: OrderStatus; payment_method: string }) {
+  return order.status === 'pending_payment' && order.payment_method === 'razorpay';
 }
 
 function toOrder(raw: Order): Order {
@@ -132,6 +158,7 @@ export type PlaceOrderInput = {
   billingGstin: string | null;
   couponCode: string | null;
   note: string | null;
+  paymentMethod: PaymentMethod;
 };
 
 // 15-character GSTIN: 2-digit state code, PAN, entity number, "Z", checksum (as the backend checks).
@@ -147,10 +174,11 @@ export function validateGstDetails(companyName: string, gstin: string): { billin
   return errors;
 }
 
-// POST /api/orders — places a Cash on Delivery order from the whole cart and
-// empties the cart.
-export async function placeOrder(input: PlaceOrderInput): Promise<Order> {
-  const raw = await authRequest<Order>('POST', '/api/orders', {
+// POST /api/orders — places an order from the whole cart. Cash on Delivery: placed
+// and the cart emptied. Razorpay: the order waits for payment (cart kept) and
+// `razorpay` holds the options for openRazorpayCheckout.
+export async function placeOrder(input: PlaceOrderInput): Promise<Order & { razorpay?: RazorpayCheckoutOptions }> {
+  const raw = await authRequest<Order & { razorpay?: RazorpayCheckoutOptions }>('POST', '/api/orders', {
     address_id: input.addressId,
     billing_same_as_shipping: input.billingSameAsShipping,
     billing_address_id: input.billingSameAsShipping ? undefined : input.billingAddressId,
@@ -158,9 +186,19 @@ export async function placeOrder(input: PlaceOrderInput): Promise<Order> {
     billing_gstin: input.billingGstin || undefined,
     coupon_code: input.couponCode || undefined,
     note: input.note || undefined,
-    payment_method: 'cod'
+    payment_method: input.paymentMethod
   });
-  return toOrder(raw);
+  return { ...toOrder(raw), razorpay: raw.razorpay };
+}
+
+// POST /api/orders/:orderNo/pay — Razorpay options to (re)try paying an order waiting for payment.
+export async function payOrder(orderNo: string): Promise<RazorpayCheckoutOptions> {
+  return authRequest<RazorpayCheckoutOptions>('POST', `/api/orders/${encodeURIComponent(orderNo)}/pay`);
+}
+
+// POST /api/orders/:orderNo/verify-payment — the API checks the signature with Razorpay and places the order.
+export async function verifyOrderPayment(orderNo: string, result: RazorpaySuccess): Promise<Order> {
+  return toOrder(await authRequest<Order>('POST', `/api/orders/${encodeURIComponent(orderNo)}/verify-payment`, result));
 }
 
 // GET /api/orders/:orderNo
@@ -180,9 +218,9 @@ export async function listOrders(page = 1, limit = 10): Promise<Paginated<OrderL
   };
 }
 
-// Cancelled orders have no invoice (the API refuses them too).
+// Cancelled and unpaid online orders have no invoice (the API refuses them too).
 export function canDownloadInvoice(order: { status: OrderStatus }) {
-  return order.status !== 'cancelled';
+  return order.status !== 'cancelled' && order.status !== 'pending_payment';
 }
 
 // GET /api/orders/:orderNo/invoice — saves the PDF tax invoice.

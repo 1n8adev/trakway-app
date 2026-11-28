@@ -18,6 +18,8 @@ ordersRouter.post('/', ...body, validate(orderValidation.place), orderController
 ordersRouter.get('/', orderController.list);
 ordersRouter.get('/:orderNo', orderController.get);
 ordersRouter.get('/:orderNo/invoice', orderController.invoice);
+ordersRouter.post('/:orderNo/pay', orderController.pay);
+ordersRouter.post('/:orderNo/verify-payment', ...body, validate(orderValidation.verifyPayment), orderController.verifyPayment);
 ordersRouter.post('/:orderNo/cancel', ...body, validate(orderValidation.cancel), orderController.cancel);
 
 module.exports = { checkoutRouter, ordersRouter };

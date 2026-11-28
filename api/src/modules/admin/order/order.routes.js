@@ -13,6 +13,8 @@ router.get('/summary', orderController.summary); // before /:id
 router.get('/:id', orderController.getById);
 router.get('/:id/invoice', orderController.invoice);
 router.patch('/:id/status', ...body, validate(orderValidation.status), orderController.setStatus);
+router.post('/:id/refund', orderController.refund);
+router.post('/:id/sync-payment', orderController.syncPayment);
 router.patch('/:id', ...body, validate(orderValidation.update), orderController.update);
 
 module.exports = router;

@@ -38,6 +38,7 @@ async function getInvoicePdf(orderId) {
   let order = await invoiceRepository.findOrder(orderId);
   if (!order) throw ApiError.notFound('Order not found');
   if (order.status === 'cancelled') throw ApiError.conflict('Invoices are not available for cancelled orders');
+  if (order.status === 'pending_payment') throw ApiError.conflict('The invoice is available once the payment is completed');
 
   if (!order.invoice_no) {
     await invoiceRepository.assignInvoiceNumber(order.id, financialYear(), invoiceNumber);

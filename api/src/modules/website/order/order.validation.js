@@ -42,7 +42,7 @@ function summary(body) {
 }
 
 // POST /orders — { address_id?, billing_same_as_shipping?, billing_address_id?, billing_company_name?,
-//                  billing_gstin?, coupon_code?, note?, payment_method? ('cod') }
+//                  billing_gstin?, coupon_code?, note?, payment_method? ('cod' | 'razorpay') }
 function place(body) {
   const errors = {};
   if (body.address_id !== undefined && body.address_id !== null && !isPositiveInt(body.address_id)) {
@@ -71,8 +71,8 @@ function place(body) {
   if (body.note !== undefined && body.note !== null && (typeof body.note !== 'string' || body.note.length > 500)) {
     errors.note = 'Note must be at most 500 characters';
   }
-  if (body.payment_method !== undefined && body.payment_method !== 'cod') {
-    errors.payment_method = 'Only Cash on Delivery (cod) is available';
+  if (body.payment_method !== undefined && body.payment_method !== '' && !['cod', 'razorpay'].includes(body.payment_method)) {
+    errors.payment_method = 'payment_method must be cod or razorpay';
   }
   return errors;
 }
@@ -83,4 +83,14 @@ function cancel(body) {
     ? { reason: 'Reason must be at most 255 characters' } : {};
 }
 
-module.exports = { normalize, summary, place, cancel };
+// POST /orders/:orderNo/verify-payment — the three values Razorpay Checkout hands to its success handler.
+function verifyPayment(body) {
+  const errors = {};
+  for (const key of ['razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature']) {
+    const value = body[key];
+    if (typeof value !== 'string' || !value.trim() || value.length > 200) errors[key] = `${key} is required`;
+  }
+  return errors;
+}
+
+module.exports = { normalize, summary, place, cancel, verifyPayment };

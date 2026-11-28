@@ -34,6 +34,18 @@ module.exports = {
     pass: process.env.SMTP_PASS || '',
   },
   mailFrom: process.env.MAIL_FROM || process.env.SMTP_USER || 'Trakway <no-reply@localhost>',
+  // Cash on Delivery on the website. Off unless COD_ENABLED=true (online payment only).
+  codEnabled: (process.env.COD_ENABLED || 'false').toLowerCase() === 'true',
+  // Razorpay online payments. Needs RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET.
+  // RAZORPAY_WEBHOOK_SECRET is the secret set on the webhook in the Razorpay dashboard.
+  // Unpaid online orders are cancelled after RAZORPAY_PENDING_MINUTES.
+  razorpay: {
+    keyId: (process.env.RAZORPAY_KEY_ID || '').trim(),
+    keySecret: (process.env.RAZORPAY_KEY_SECRET || '').trim(),
+    webhookSecret: (process.env.RAZORPAY_WEBHOOK_SECRET || '').trim(),
+    pendingMinutes: Number(process.env.RAZORPAY_PENDING_MINUTES) || 30,
+    businessName: process.env.RAZORPAY_BUSINESS_NAME || 'Trakway',
+  },
   // Comma-separated addresses that get a copy of every new order. Empty = no admin email.
   adminOrderEmails: (process.env.ADMIN_ORDER_EMAIL || '').split(',').map((e) => e.trim()).filter(Boolean),
   // Comma-separated origins allowed to call the API from a browser,

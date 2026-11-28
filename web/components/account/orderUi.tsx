@@ -1,6 +1,7 @@
 import type { OrderStatus, PaymentStatus } from '@/lib/checkout';
 
 export const ORDER_STATUS: Record<OrderStatus, { label: string; className: string }> = {
+  pending_payment: { label: 'Payment pending', className: 'bg-amber-50 text-amber-700' },
   placed: { label: 'Placed', className: 'bg-blue-50 text-blue-700' },
   confirmed: { label: 'Confirmed', className: 'bg-brand-50 text-brand-700' },
   shipped: { label: 'Shipped', className: 'bg-purple-50 text-purple-700' },
@@ -11,7 +12,9 @@ export const ORDER_STATUS: Record<OrderStatus, { label: string; className: strin
 export const PAYMENT_STATUS: Record<PaymentStatus, string> = {
   pending: 'Pay on delivery',
   paid: 'Paid',
-  cancelled: 'Cancelled'
+  failed: 'Not paid',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded'
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {

@@ -2,17 +2,22 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Image from 'next/image';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { AuthApiError } from '@/lib/auth';
+import { refreshCart } from '@/lib/cart';
 import {
   cancelOrder,
   canCancelOrder,
   canDownloadInvoice,
+  canPayOrder,
   downloadInvoice,
   fetchOrder,
+  payOrder,
+  verifyOrderPayment,
   type Order,
   type OrderStatus
 } from '@/lib/checkout';
+import { openRazorpayCheckout, RazorpayCheckoutError } from '@/lib/razorpay';
 import { formatPrice } from '@/lib/format';
 import { FormAlert } from '@/components/auth/fields';
 import { BillingAddress, GstDetails } from '@/components/checkout/OrderBilling';
@@ -25,19 +30,55 @@ function errorMessage(error: unknown) {
   return error instanceof AuthApiError ? error.message : 'Something went wrong. Please try again.';
 }
 
-const STEPS: { status: Exclude<OrderStatus, 'cancelled'>; label: string; date: (o: Order) => string | null }[] = [
+const STEPS: { status: Exclude<OrderStatus, 'cancelled' | 'pending_payment'>; label: string; date: (o: Order) => string | null }[] = [
   { status: 'placed', label: 'Order placed', date: (o) => o.created_at },
   { status: 'confirmed', label: 'Confirmed', date: (o) => o.confirmed_at },
   { status: 'shipped', label: 'Shipped', date: (o) => o.shipped_at },
   { status: 'delivered', label: 'Delivered', date: (o) => o.delivered_at }
 ];
 
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  upi: 'UPI',
+  card: 'Card',
+  netbanking: 'Net banking',
+  wallet: 'Wallet',
+  emi: 'EMI',
+  paylater: 'Pay later'
+};
+
+// Message for ?payment= after returning from checkout without a confirmed payment.
+const RETURN_MESSAGES: Record<string, string> = {
+  cancelled: 'Payment was cancelled. Your order is saved — complete the payment to place it.',
+  failed: 'Payment failed. No money was taken for this order — please try again.'
+};
+
 function Timeline({ order }: { order: Order }) {
+  if (order.status === 'pending_payment') {
+    return (
+      <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="font-bold">Waiting for payment</p>
+        <p className="mt-1">
+          This order will be placed as soon as the payment is complete. Unpaid orders are cancelled automatically after a short
+          while.
+        </p>
+      </div>
+    );
+  }
   if (order.status === 'cancelled') {
     return (
       <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
         <p className="font-bold">Order cancelled{order.cancelled_at && ` on ${formatOrderDateTime(order.cancelled_at)}`}</p>
         {order.cancel_reason && <p className="mt-1">Reason: {order.cancel_reason}</p>}
+        {order.payment_status === 'refunded' && (
+          <p className="mt-1">
+            Refund of {formatPrice(order.payment?.refund_amount ?? order.total)}{' '}
+            {order.payment?.refund_status === 'processed' ? 'has been processed' : 'has been started'} to your original
+            payment method. It usually reaches you in 5–7 working days.
+          </p>
+        )}
+        {order.payment_status === 'paid' && (
+          <p className="mt-1">Your refund will be processed shortly to your original payment method.</p>
+        )}
       </div>
     );
   }
@@ -98,7 +139,11 @@ function CancelPanel({ order, onCancelled, onClose }: { order: Order; onCancelle
   return (
     <form onSubmit={handleSubmit} className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
       <h2 className="font-bold text-gray-900">Cancel this order?</h2>
-      <p className="mt-1 text-sm text-gray-600">This can’t be undone. You won’t be charged anything for a cancelled order.</p>
+      <p className="mt-1 text-sm text-gray-600">
+        {order.payment_status === 'paid'
+          ? `This can’t be undone. The ${formatPrice(order.total)} you paid will be refunded to your original payment method.`
+          : 'This can’t be undone. You won’t be charged anything for a cancelled order.'}
+      </p>
       {error && (
         <div className="mt-4">
           <FormAlert>{error}</FormAlert>
@@ -137,10 +182,43 @@ function CancelPanel({ order, onCancelled, onClose }: { order: Order; onCancelle
 }
 
 export default function OrderDetails({ orderNo }: { orderNo: string }) {
+  const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [payState, setPayState] = useState<'paying' | 'verifying' | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+
+  // Back from checkout without a confirmed payment (?payment=cancelled|failed|unverified&message=).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('payment');
+    if (!result) return;
+    setPayError(result === 'unverified' ? params.get('message') || 'We could not confirm your payment yet.' : RETURN_MESSAGES[result] ?? null);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
+  async function handlePay() {
+    if (!order) return;
+    setPayError(null);
+    setNotice(null);
+    setPayState('paying');
+    try {
+      const options = await payOrder(order.order_no);
+      const result = await openRazorpayCheckout(options);
+      setPayState('verifying');
+      await verifyOrderPayment(order.order_no, result);
+      refreshCart().catch(() => {});
+      router.replace(`/checkout/success?order=${encodeURIComponent(order.order_no)}`);
+    } catch (err) {
+      setPayState(null);
+      if (err instanceof RazorpayCheckoutError) setPayError(err.reason === 'dismissed' ? RETURN_MESSAGES.cancelled : err.message);
+      else setPayError(errorMessage(err));
+      // The order may have been paid, cancelled or expired meanwhile.
+      fetchOrder(order.order_no).then(setOrder).catch(() => {});
+    }
+  }
   const [invoicePending, setInvoicePending] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
 
@@ -206,6 +284,20 @@ export default function OrderDetails({ orderNo }: { orderNo: string }) {
             <p className="mt-1 text-sm text-gray-500">Placed on {formatOrderDateTime(order.created_at)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {canPayOrder(order) && (
+              <button
+                type="button"
+                onClick={handlePay}
+                disabled={payState !== null}
+                className="rounded-full bg-brand-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              >
+                {payState === 'verifying'
+                  ? 'Confirming payment…'
+                  : payState === 'paying'
+                    ? 'Opening payment…'
+                    : `Pay now · ${formatPrice(order.total)}`}
+              </button>
+            )}
             {canDownloadInvoice(order) && (
               <button
                 type="button"
@@ -241,6 +333,11 @@ export default function OrderDetails({ orderNo }: { orderNo: string }) {
             <FormAlert>{invoiceError}</FormAlert>
           </div>
         )}
+        {payError && (
+          <div className="mt-4">
+            <FormAlert>{payError}</FormAlert>
+          </div>
+        )}
 
         <div className="mt-6">
           <Timeline order={order} />
@@ -256,7 +353,7 @@ export default function OrderDetails({ orderNo }: { orderNo: string }) {
           onCancelled={(updated) => {
             setOrder(updated);
             setCancelling(false);
-            setNotice(`Order ${updated.order_no} has been cancelled.`);
+            setNotice(updated.refund_error ?? `Order ${updated.order_no} has been cancelled.`);
           }}
         />
       )}
@@ -330,9 +427,18 @@ export default function OrderDetails({ orderNo }: { orderNo: string }) {
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-bold text-gray-900">Payment</h2>
             <span className="text-xs font-semibold text-gray-500">
-              Cash on Delivery · {PAYMENT_STATUS[order.payment_status] ?? order.payment_status}
+              {order.payment_method === 'razorpay' ? 'Online' : 'Cash on Delivery'} ·{' '}
+              {order.payment_method === 'razorpay' && order.payment_status === 'pending'
+                ? 'Awaiting payment'
+                : (PAYMENT_STATUS[order.payment_status] ?? order.payment_status)}
             </span>
           </div>
+          {order.payment_method === 'razorpay' && order.payment && ['captured', 'refunded'].includes(order.payment.status) && (
+            <p className="mt-2 text-xs text-gray-500">
+              Paid via {PAYMENT_METHOD_LABEL[order.payment.method ?? ''] ?? order.payment.method ?? 'Razorpay'}
+              {order.paid_at && ` on ${formatOrderDateTime(order.paid_at)}`} · Payment ID {order.payment.razorpay_payment_id}
+            </p>
+          )}
           <dl className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-gray-500">Price</dt>

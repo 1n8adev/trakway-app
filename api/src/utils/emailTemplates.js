@@ -29,6 +29,12 @@ function otpEmail({ name, code, purpose, minutes }) {
 
 const { formatInr } = require('./money');
 
+const isPaidOnline = (order) => order.payment_method === 'razorpay' && order.payment_status === 'paid';
+// "Cash on Delivery" / "Paid online (Razorpay)"
+const paymentLabel = (order) => (order.payment_method === 'razorpay'
+  ? (isPaidOnline(order) ? 'Paid online (Razorpay)' : 'Online (Razorpay)') : 'Cash on Delivery');
+const paymentShort = (order) => (order.payment_method === 'razorpay' ? 'PAID ONLINE' : 'COD');
+
 const itemRowsHtml = (items) => items.map((item) => `
     <tr>
       <td style="padding:8px 0;border-bottom:1px solid #f3f4f6">
@@ -45,7 +51,7 @@ const totalsHtml = (order) => `
       <td style="text-align:right;color:#16a34a">− ${formatInr(order.coupon_discount)}</td></tr>` : ''}
     <tr><td style="padding:4px 0;color:#6b7280">Shipping</td>
       <td style="text-align:right">${order.shipping_fee > 0 ? formatInr(order.shipping_fee) : 'Free'}</td></tr>
-    <tr><td style="padding:8px 0;font-weight:bold;border-top:1px solid #e5e7eb">Total (Cash on Delivery)</td>
+    <tr><td style="padding:8px 0;font-weight:bold;border-top:1px solid #e5e7eb">Total (${paymentLabel(order)})</td>
       <td style="padding:8px 0;font-weight:bold;border-top:1px solid #e5e7eb;text-align:right">${formatInr(order.total)}</td></tr>`;
 
 // prefix "ship" (delivery) or "bill" (billing) order columns.
@@ -87,15 +93,17 @@ function orderPlacedEmail({ order, items, customerName }) {
   <p>Hi ${escapeHtml(customerName)},</p>
   <p>Thank you for your order! We have received it and will contact you shortly to confirm delivery.</p>
   <p style="margin:16px 0"><strong>Order number:</strong> ${order.order_no}<br>
-     <strong>Payment:</strong> Cash on Delivery</p>
+     <strong>Payment:</strong> ${paymentLabel(order)}</p>
   <table style="width:100%;border-collapse:collapse;font-size:14px">${itemRowsHtml(items)}</table>
   <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px">${totalsHtml(order)}</table>
   <h3 style="margin:24px 0 8px;font-size:15px">Delivery address</h3>
   <p style="font-size:14px;line-height:1.5;margin:0">${addressHtml(order)}</p>${billingHtml(order)}
-  <p style="color:#6b7280;font-size:13px;margin-top:24px">Please keep ${formatInr(order.total)} ready at the time of delivery.</p>
+  <p style="color:#6b7280;font-size:13px;margin-top:24px">${isPaidOnline(order)
+    ? `We have received your payment of ${formatInr(order.total)}.`
+    : `Please keep ${formatInr(order.total)} ready at the time of delivery.`}</p>
   <p style="color:#6b7280;font-size:13px">— Team Trakway</p>
 </div>`;
-  const text = `Hi ${customerName},\n\nThank you for your order! Order number: ${order.order_no}\nPayment: Cash on Delivery\n\n`
+  const text = `Hi ${customerName},\n\nThank you for your order! Order number: ${order.order_no}\nPayment: ${paymentLabel(order)}\n\n`
     + `${itemsText(items)}\n\nTotal: ${formatInr(order.total)}\n\nDelivery to: ${order.ship_name}, ${order.ship_address_line1}, `
     + `${order.ship_city}, ${order.ship_state} - ${order.ship_pincode} (${order.ship_phone})\n\n— Team Trakway`;
   return { subject, html, text };
@@ -103,7 +111,7 @@ function orderPlacedEmail({ order, items, customerName }) {
 
 // Sent to ADMIN_ORDER_EMAIL when a new order comes in.
 function newOrderAdminEmail({ order, items, customer }) {
-  const subject = `New order ${order.order_no} — ${formatInr(order.total)} (COD)`;
+  const subject = `New order ${order.order_no} — ${formatInr(order.total)} (${paymentShort(order)})`;
   const html = `
 <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2937">
   <h2 style="margin:0 0 16px">New order ${order.order_no}</h2>
@@ -115,7 +123,7 @@ function newOrderAdminEmail({ order, items, customer }) {
   ${order.customer_note ? `<p><strong>Customer note:</strong> ${escapeHtml(order.customer_note)}</p>` : ''}
 </div>`;
   const text = `New order ${order.order_no} from ${customer.name} (${customer.email})\n\n${itemsText(items)}\n\n`
-    + `Total: ${formatInr(order.total)} (COD)\nDeliver to: ${order.ship_name}, ${order.ship_phone}, ${order.ship_city} ${order.ship_pincode}`;
+    + `Total: ${formatInr(order.total)} (${paymentShort(order)})\nDeliver to: ${order.ship_name}, ${order.ship_phone}, ${order.ship_city} ${order.ship_pincode}`;
   return { subject, html, text };
 }
 

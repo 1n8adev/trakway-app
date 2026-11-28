@@ -7,7 +7,7 @@ const COLUMNS = `o.id, ${ORDER_NO} AS order_no, o.status, o.payment_method, o.pa
   o.ship_name, o.ship_phone, o.ship_address_line1, o.ship_address_line2, o.ship_landmark,
   o.ship_city, o.ship_state, o.ship_pincode, o.billing_same_as_shipping, o.bill_name, o.bill_phone, o.bill_address_line1, o.bill_address_line2,
   o.bill_landmark, o.bill_city, o.bill_state, o.bill_pincode, o.bill_company_name, o.bill_gstin,
-  o.customer_note, o.admin_notes, o.cancel_reason,
+  o.customer_note, o.admin_notes, o.cancel_reason, o.razorpay_order_id, o.paid_at,
   o.confirmed_at, o.shipped_at, o.delivered_at, o.cancelled_at, o.created_at, o.updated_at,
   o.user_id, u.name AS customer_name, u.email AS customer_email, u.phone AS customer_phone,
   (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS items_count`;

@@ -6,7 +6,8 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { AuthApiError } from '@/lib/auth';
 import { createAddress, deleteAddress, listAddresses, validateAddress, type Address } from '@/lib/addresses';
 import { refreshCart } from '@/lib/cart';
-import { fetchCheckoutSummary, placeOrder, validateGstDetails, type CheckoutSummary } from '@/lib/checkout';
+import { fetchCheckoutSummary, placeOrder, validateGstDetails, verifyOrderPayment, type CheckoutSummary, type PaymentMethod } from '@/lib/checkout';
+import { openRazorpayCheckout, RazorpayCheckoutError } from '@/lib/razorpay';
 import { formatPrice } from '@/lib/format';
 import { useAuthSession } from '@/components/auth/useAuthSession';
 import { FormAlert } from '@/components/auth/fields';
@@ -121,6 +122,46 @@ function AddressPicker({
   );
 }
 
+function PaymentOption({
+  value,
+  checked,
+  onSelect,
+  title,
+  description,
+  icon
+}: {
+  value: PaymentMethod;
+  checked: boolean;
+  onSelect: (value: PaymentMethod) => void;
+  title: string;
+  description: ReactNode;
+  icon: ReactNode;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+        checked ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-100' : 'border-gray-200 hover:border-gray-400'
+      }`}
+    >
+      <input
+        type="radio"
+        name="payment_method"
+        value={value}
+        checked={checked}
+        onChange={() => onSelect(value)}
+        className="mt-1 h-4 w-4 shrink-0 accent-brand-600"
+      />
+      <span>
+        <span className="flex items-center gap-2 font-bold text-gray-900">
+          {icon}
+          {title}
+        </span>
+        <span className="mt-1 block text-sm text-gray-600">{description}</span>
+      </span>
+    </label>
+  );
+}
+
 function TotalRow({ label, value, tone }: { label: ReactNode; value: string; tone?: 'discount' | 'free' }) {
   const color = tone === 'discount' ? 'text-red-500' : tone === 'free' ? 'text-green-600' : 'text-gray-900';
   return (
@@ -153,7 +194,10 @@ export default function CheckoutView() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   const [note, setNote] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [placing, setPlacing] = useState(false);
+  // 'paying' while the Razorpay popup is open, 'verifying' while the API confirms the payment.
+  const [payStage, setPayStage] = useState<'paying' | 'verifying' | null>(null);
   const [placeError, setPlaceError] = useState<{ message: string; backToCart?: boolean } | null>(null);
 
   const loggedIn = Boolean(session);
@@ -246,6 +290,8 @@ export default function CheckoutView() {
         }
       }
 
+      const methods = summary?.paymentMethods ?? [];
+      const method: PaymentMethod = paymentMethod && methods.includes(paymentMethod) ? paymentMethod : methods[0];
       const order = await placeOrder({
         addressId: shippingId,
         billingSameAsShipping: billingSame,
@@ -253,13 +299,39 @@ export default function CheckoutView() {
         billingCompanyName: billingSame ? null : billingDraft.company_name.trim() || null,
         billingGstin: billingSame ? null : billingDraft.gstin.trim() || null,
         couponCode: summary?.coupon?.code ?? null,
-        note: note.trim() || null
+        note: note.trim() || null,
+        paymentMethod: method
       });
       if (tempBillingId) deleteAddress(tempBillingId).catch(() => {});
+      tempBillingId = null;
+
+      if (order.razorpay) {
+        // The order now waits for payment; the cart is kept until the payment is confirmed.
+        const orderPage = `/account/orders/${encodeURIComponent(order.order_no)}`;
+        setPayStage('paying');
+        let result;
+        try {
+          result = await openRazorpayCheckout(order.razorpay);
+        } catch (payErr) {
+          // Closed or failed: the order page has "Pay now" to retry (unpaid orders are cancelled after a while).
+          const reason = payErr instanceof RazorpayCheckoutError ? payErr.reason : 'failed';
+          router.replace(`${orderPage}?payment=${reason === 'dismissed' ? 'cancelled' : 'failed'}`);
+          return;
+        }
+        setPayStage('verifying');
+        try {
+          await verifyOrderPayment(order.order_no, result);
+        } catch (verifyErr) {
+          router.replace(`${orderPage}?payment=unverified&message=${encodeURIComponent(errorMessage(verifyErr))}`);
+          return;
+        }
+      }
+
       // The backend emptied the cart; update the header badge.
       refreshCart().catch(() => {});
       router.replace(`/checkout/success?order=${encodeURIComponent(order.order_no)}`);
     } catch (err) {
+      setPayStage(null);
       setPlacing(false);
       if (tempBillingId) deleteAddress(tempBillingId).catch(() => {});
       // Billing field errors, from saving the address or from the order (GST details).
@@ -339,8 +411,22 @@ export default function CheckoutView() {
   const productDiscount = Math.max(0, totals.mrpTotal - totals.subtotal);
   const totalSavings = productDiscount + totals.couponDiscount;
   const hasUnavailable = summary.summary.unavailableCount > 0;
-  const canPlace = Boolean(shippingId) && !hasUnavailable && !placing;
+
   const user = session.user;
+  const methods = summary.paymentMethods;
+  const selectedMethod: PaymentMethod = paymentMethod && methods.includes(paymentMethod) ? paymentMethod : methods[0];
+  const online = selectedMethod === 'razorpay';
+  const canPlace = Boolean(shippingId) && !hasUnavailable && !placing && methods.length > 0;
+  const placeLabel =
+    payStage === 'verifying'
+      ? 'Confirming payment…'
+      : payStage === 'paying'
+        ? 'Waiting for payment…'
+        : placing
+          ? online
+            ? 'Starting payment…'
+            : 'Placing order…'
+          : `${online ? 'Pay' : 'Place order'} · ${formatPrice(totals.total)}`;
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-12">
@@ -412,23 +498,44 @@ export default function CheckoutView() {
         </div>
 
         <Step number={3} title="Payment method">
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-600 bg-brand-50 p-4 ring-2 ring-brand-100">
-            <input type="radio" name="payment_method" value="cod" checked readOnly className="mt-1 h-4 w-4 accent-brand-600" />
-            <span>
-              <span className="flex items-center gap-2 font-bold text-gray-900">
+          <div role="radiogroup" className="space-y-3">
+            {methods.includes('razorpay') && (
+              <PaymentOption
+                value="razorpay"
+                checked={selectedMethod === 'razorpay'}
+                onSelect={setPaymentMethod}
+                title="Pay online"
+                description="UPI, credit / debit card, net banking or wallet. Secured by Razorpay."
+                icon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-brand-600" aria-hidden="true">
+                    <rect x="2.5" y="5" width="19" height="14" rx="2" />
+                    <path d="M2.5 9.5h19M6 15h4" />
+                  </svg>
+                }
+              />
+            )}
+            {methods.includes('cod') && (
+            <PaymentOption
+              value="cod"
+              checked={selectedMethod === 'cod'}
+              onSelect={setPaymentMethod}
+              title="Cash on Delivery"
+              description={<>Pay {formatPrice(totals.total)} in cash when your order is delivered.</>}
+              icon={
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 text-brand-600" aria-hidden="true">
                   <rect x="2.5" y="6" width="19" height="12" rx="2" />
                   <circle cx="12" cy="12" r="2.5" />
                   <path d="M6 9.5v5M18 9.5v5" />
                 </svg>
-                Cash on Delivery
-              </span>
-              <span className="mt-1 block text-sm text-gray-600">
-                Pay {formatPrice(totals.total)} in cash when your order is delivered.
-              </span>
-            </span>
-          </label>
-          <p className="mt-3 text-xs text-gray-500">Online payment options are coming soon.</p>
+              }
+            />
+            )}
+            {methods.length === 0 && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Online payment is not available right now. Please try again in a little while.
+              </p>
+            )}
+          </div>
 
           <div className="mt-6">
             <label htmlFor="order_note" className="mb-1.5 block text-sm font-semibold text-gray-700">
@@ -593,7 +700,7 @@ export default function CheckoutView() {
           disabled={!canPlace}
           className="mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-ink-700 px-6 py-4 text-sm font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          {placing ? 'Placing order…' : `Place order · ${formatPrice(totals.total)}`}
+          {placeLabel}
           {!placing && (
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5" aria-hidden="true">
               <path d="M5 12h14M13 6l6 6-6 6" />
@@ -601,7 +708,7 @@ export default function CheckoutView() {
           )}
         </button>
         <p className="mt-3 text-center text-xs text-gray-500">
-          Cash on Delivery · Inclusive of all taxes · Free shipping across India
+          {online ? 'Secure online payment' : 'Cash on Delivery'} · Inclusive of all taxes · Free shipping across India
         </p>
       </aside>
     </div>

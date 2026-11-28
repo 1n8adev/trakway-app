@@ -253,9 +253,9 @@ function renderInvoicePdf({ seller, order, items, tax }) {
     doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT).text('Amount in words: ', MARGIN, y, { continued: true })
       .font('Helvetica').text(amountInWords(order.total), { width: CONTENT_WIDTH });
     y = doc.y + 6;
-    const payment = order.payment_method === 'cod' ? 'Cash on Delivery' : order.payment_method;
+    const payment = order.payment_method === 'razorpay' ? 'Online (Razorpay)' : 'Cash on Delivery';
     doc.font('Helvetica-Bold').text('Payment: ', MARGIN, y, { continued: true })
-      .font('Helvetica').text(`${payment} (${order.payment_status === 'paid' ? 'Paid' : 'Payment pending'})`);
+      .font('Helvetica').text(`${payment} (${{ paid: 'Paid', refunded: 'Refunded' }[order.payment_status] || 'Payment pending'})`);
 
     // ---- footer on every page ----
     const range = doc.bufferedPageRange();

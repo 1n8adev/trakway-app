@@ -17,7 +17,8 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 // CORS: only the origins in CORS_ORIGINS when set, otherwise every origin (development).
 // Content-Disposition is exposed so the browser apps can read the invoice PDF's file name.
 app.use(cors({ ...(env.corsOrigins.length ? { origin: env.corsOrigins } : {}), exposedHeaders: ['Content-Disposition'] }));
-app.use(express.json({ limit: '1mb' }));
+// The raw body is kept for webhook signature checks (Razorpay signs the exact bytes).
+app.use(express.json({ limit: '1mb', verify: (req, res, buf) => { if (req.originalUrl.startsWith('/api/payments/')) req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 if (env.nodeEnv !== 'test') app.use(morgan('dev'));
 

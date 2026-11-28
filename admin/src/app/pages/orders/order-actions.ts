@@ -7,7 +7,10 @@ import { CancelOrder, CancelOrderData } from './cancel-order/cancel-order';
 const CONFIRM_MESSAGE: Partial<Record<OrderStatus, (o: Order) => string>> = {
   confirmed: (o) => `You've checked stock for ${o.order_no} and will pack it for dispatch.`,
   shipped: (o) => `${o.order_no} has been handed to the courier for ${o.ship_city}, ${o.ship_pincode}.`,
-  delivered: (o) => `${o.order_no} reached the customer and the cash was collected. Payment will be marked paid. This can't be undone.`,
+  delivered: (o) =>
+    o.payment_method === 'razorpay'
+      ? `${o.order_no} reached the customer (already paid online). This can't be undone.`
+      : `${o.order_no} reached the customer and the cash was collected. Payment will be marked paid. This can't be undone.`,
 };
 
 // Asks before moving an order on. Emits the PATCH body, or undefined when the admin backs out.

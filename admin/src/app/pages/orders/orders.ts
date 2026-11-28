@@ -15,6 +15,7 @@ import {
   Order,
   OrderStatus,
   OrderSummary,
+  PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_BADGE,
   PAYMENT_STATUS_LABEL,
   PaymentStatus,
@@ -28,11 +29,12 @@ import { askStatusChange } from './order-actions';
 
 type Tab = 'all' | OrderStatus;
 
-const TABS: Tab[] = ['placed', 'confirmed', 'shipped', 'delivered', 'cancelled', 'all'];
-const PAYMENT_STATUSES: PaymentStatus[] = ['pending', 'paid', 'cancelled'];
+const TABS: Tab[] = ['placed', 'confirmed', 'shipped', 'delivered', 'cancelled', 'pending_payment', 'all'];
+const PAYMENT_STATUSES: PaymentStatus[] = ['pending', 'paid', 'failed', 'cancelled', 'refunded'];
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-// Website orders (Cash on Delivery): Placed -> Confirmed -> Shipped -> Delivered, or Cancelled.
+// Website orders (Cash on Delivery or Razorpay): Placed -> Confirmed -> Shipped -> Delivered, or Cancelled.
+// Online orders start as Payment Pending and become Placed once paid.
 // Filters live in the URL so coming back from an order keeps the same view.
 @Component({
   selector: 'app-orders',
@@ -54,6 +56,7 @@ export class Orders implements OnInit {
   protected readonly PAYMENT_LABEL = PAYMENT_STATUS_LABEL;
   protected readonly PAYMENT_BADGE = PAYMENT_STATUS_BADGE;
   protected readonly ACTION_LABEL = ORDER_ACTION_LABEL;
+  protected readonly METHOD_LABEL = PAYMENT_METHOD_LABEL;
   protected readonly paymentStatuses = PAYMENT_STATUSES;
   protected readonly rupees = rupees;
   protected readonly today = todayIso();

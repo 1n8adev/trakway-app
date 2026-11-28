@@ -7,7 +7,7 @@ const ORDER_COLUMNS = `o.id, ${ORDER_NO} AS order_no, o.user_id, o.status, o.pay
   o.ship_name, o.ship_phone, o.ship_address_line1, o.ship_address_line2, o.ship_landmark,
   o.ship_city, o.ship_state, o.ship_pincode, o.billing_same_as_shipping, o.bill_name, o.bill_phone, o.bill_address_line1, o.bill_address_line2,
   o.bill_landmark, o.bill_city, o.bill_state, o.bill_pincode, o.bill_company_name, o.bill_gstin,
-  o.customer_note, o.cancel_reason,
+  o.customer_note, o.cancel_reason, o.paid_at,
   o.confirmed_at, o.shipped_at, o.delivered_at, o.cancelled_at, o.created_at, o.updated_at`;
 
 // ---- coupons ----
@@ -35,7 +35,7 @@ async function couponUsage(couponId, userId, client = db.pool) {
 
 // ---- orders ----
 
-const INSERT_FIELDS = ['user_id', 'subtotal', 'mrp_total', 'coupon_id', 'coupon_code', 'coupon_discount',
+const INSERT_FIELDS = ['user_id', 'status', 'payment_method', 'subtotal', 'mrp_total', 'coupon_id', 'coupon_code', 'coupon_discount',
   'shipping_fee', 'total', 'ship_name', 'ship_phone', 'ship_address_line1', 'ship_address_line2', 'ship_landmark',
   'ship_city', 'ship_state', 'ship_pincode', 'billing_same_as_shipping', 'bill_name', 'bill_phone',
   'bill_address_line1', 'bill_address_line2', 'bill_landmark', 'bill_city', 'bill_state', 'bill_pincode',
@@ -96,9 +96,11 @@ async function findItems(orderId) {
 }
 
 // Cancels only while still "placed". Returns false if the status changed meanwhile.
+// A paid online order keeps payment_status 'paid' until its refund is started.
 async function cancelPlaced(id, reason) {
   const { rowCount } = await db.query(
-    `UPDATE orders SET status = 'cancelled', payment_status = 'cancelled', cancel_reason = $2,
+    `UPDATE orders SET status = 'cancelled',
+       payment_status = CASE WHEN payment_status = 'paid' THEN 'paid' ELSE 'cancelled' END, cancel_reason = $2,
        cancelled_at = NOW(), updated_at = NOW()
      WHERE id = $1 AND status = 'placed'`,
     [id, reason],

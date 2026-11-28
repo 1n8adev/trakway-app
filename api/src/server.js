@@ -1,6 +1,7 @@
 const env = require('./config/env');
 const app = require('./app');
 const { pool, checkConnection } = require('./config/db');
+const paymentService = require('./modules/payment/payment.service');
 
 async function start() {
   try {
@@ -15,7 +16,16 @@ async function start() {
     console.log(`Trakway API running on http://localhost:${env.port}`);
   });
 
+  // Cancels online orders left unpaid (checks Razorpay first, so a missed webhook still counts as paid).
+  let expiryTimer = null;
+  if (paymentService.isEnabled()) {
+    const runExpiry = () => paymentService.expireStalePending().catch((err) => console.error('Payment expiry job failed:', err.message));
+    expiryTimer = setInterval(runExpiry, 5 * 60 * 1000);
+    runExpiry();
+  }
+
   const shutdown = () => {
+    clearInterval(expiryTimer);
     server.close(() => pool.end().then(() => process.exit(0)));
   };
   process.on('SIGINT', shutdown);

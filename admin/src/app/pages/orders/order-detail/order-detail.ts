@@ -13,8 +13,10 @@ import {
   ORDER_STATUS_LABEL,
   Order,
   OrderStatus,
+  PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_BADGE,
   PAYMENT_STATUS_LABEL,
+  OrderPayment,
 } from '../../../core/models/order.model';
 import { OrderService } from '../../../core/services/order.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -53,6 +55,7 @@ export class OrderDetail {
   protected readonly PAYMENT_LABEL = PAYMENT_STATUS_LABEL;
   protected readonly PAYMENT_BADGE = PAYMENT_STATUS_BADGE;
   protected readonly ACTION_LABEL = ORDER_ACTION_LABEL;
+  protected readonly METHOD_LABEL = PAYMENT_METHOD_LABEL;
   protected readonly FIELD_BASE = FIELD_BASE;
   protected readonly fieldState = fieldState;
   protected readonly maxNotes = ORDER_LIMITS.maxAdminNotes;
@@ -65,10 +68,11 @@ export class OrderDetail {
   protected readonly statusBusy = signal<OrderStatus | null>(null);
   protected readonly notesSaving = signal(false);
   protected readonly invoiceBusy = signal(false);
-  // Cancelled orders never get an invoice (the API refuses them too).
+  protected readonly paymentBusy = signal<'sync' | 'refund' | null>(null);
+  // Cancelled and unpaid online orders never get an invoice (the API refuses them too).
   protected readonly canInvoice = computed(() => {
     const status = this.order()?.status;
-    return !!status && status !== 'cancelled';
+    return !!status && status !== 'cancelled' && status !== 'pending_payment';
   });
 
   protected readonly notes = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(this.maxNotes)] });
@@ -89,8 +93,10 @@ export class OrderDetail {
   protected readonly timeline = computed<TimelineStep[]>(() => {
     const o = this.order();
     if (!o) return [];
+    const online = o.payment_method === 'razorpay';
     const steps: TimelineStep[] = [
-      { label: 'Order placed', at: o.created_at, done: true },
+      { label: online ? 'Checkout started' : 'Order placed', at: o.created_at, done: true },
+      ...(online ? [{ label: 'Paid online', at: o.paid_at, done: !!o.paid_at }] : []),
       { label: 'Confirmed', at: o.confirmed_at, done: !!o.confirmed_at },
       { label: 'Shipped', at: o.shipped_at, done: !!o.shipped_at },
       { label: 'Delivered', at: o.delivered_at, done: !!o.delivered_at },
@@ -155,6 +161,52 @@ export class OrderDetail {
     });
   }
 
+  // "UPI · name@okaxis", "Card · Visa •••• 4242", "Net banking · HDFC"
+  protected paymentDetail(p: OrderPayment): string {
+    const d = p.details ?? {};
+    const parts: string[] = [];
+    if (p.method === 'upi') parts.push('UPI', d.vpa ?? '');
+    else if (p.method === 'card') parts.push('Card', [d.card_network, d.card_last4 && `•••• ${d.card_last4}`].filter(Boolean).join(' '));
+    else if (p.method === 'netbanking') parts.push('Net banking', d.bank ?? '');
+    else if (p.method === 'wallet') parts.push('Wallet', d.wallet ?? '');
+    else if (p.method) parts.push(p.method);
+    return parts.filter(Boolean).join(' · ') || '—';
+  }
+
+  protected syncPayment(): void {
+    const order = this.order();
+    if (!order || this.paymentBusy()) return;
+    this.paymentBusy.set('sync');
+    this.orderService.syncPayment(order.id).subscribe({
+      next: (res) => {
+        this.paymentBusy.set(null);
+        this.toast.success(res.message);
+        this.setOrder(res.data, true);
+      },
+      error: (err) => {
+        this.paymentBusy.set(null);
+        this.toast.error(getErrorMessage(err, 'Could not check the payment'));
+      },
+    });
+  }
+
+  protected refund(): void {
+    const order = this.order();
+    if (!order || this.paymentBusy()) return;
+    this.paymentBusy.set('refund');
+    this.orderService.refund(order.id).subscribe({
+      next: (res) => {
+        this.paymentBusy.set(null);
+        this.toast.success(res.message);
+        this.setOrder(res.data, true);
+      },
+      error: (err) => {
+        this.paymentBusy.set(null);
+        this.toast.error(getErrorMessage(err, 'Could not start the refund'));
+      },
+    });
+  }
+
   // Back to the list with the filters it had, when we came from there.
   protected back(): void {
     if ((history.state as { fromList?: boolean } | null)?.fromList) this.location.back();
@@ -170,7 +222,8 @@ export class OrderDetail {
       this.orderService.setStatus(order.id, payload).subscribe({
         next: (res) => {
           this.statusBusy.set(null);
-          this.toast.success(res.message);
+          if (res.data.refund_error) this.toast.error(res.data.refund_error);
+          else this.toast.success(res.message);
           this.setOrder(res.data, true);
         },
         error: (err) => {
